@@ -18,6 +18,10 @@ pub enum DataKey {
     ActiveRound,
     /// Stores user positions for the active round: Map of Address -> UserPosition
     Positions,
+    /// Stores pending winnings for users (Address -> claimable amount)
+    PendingWinnings(Address),
+    /// Stores user statistics (Address -> UserStats)
+    UserStats(Address),
 }
 
 /// Represents which side a user bet on
@@ -36,6 +40,20 @@ pub struct UserPosition {
     pub amount: i128,
     /// Which side they bet on
     pub side: BetSide,
+}
+
+/// Tracks a user's prediction performance
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct UserStats {
+    /// Total number of rounds won
+    pub total_wins: u32,
+    /// Total number of rounds lost
+    pub total_losses: u32,
+    /// Current winning streak (consecutive wins)
+    pub current_streak: u32,
+    /// Best winning streak ever achieved
+    pub best_streak: u32,
 }
 
 /// Represents a prediction round
@@ -154,7 +172,38 @@ impl VirtualTokenContract {
         env.storage().persistent().get(&DataKey::Oracle)
     }
     
-    /// Resolves a round with the final price and distributes winnings
+    /// Gets a user's statistics (wins, losses, streaks)
+    /// 
+    /// # Parameters
+    /// * `env` - The contract environment
+    /// * `user` - The address of the user
+    /// 
+    /// # Returns
+    /// UserStats if the user has participated, or default stats (all zeros)
+    pub fn get_user_stats(env: Env, user: Address) -> UserStats {
+        let key = DataKey::UserStats(user);
+        env.storage().persistent().get(&key).unwrap_or(UserStats {
+            total_wins: 0,
+            total_losses: 0,
+            current_streak: 0,
+            best_streak: 0,
+        })
+    }
+    
+    /// Gets a user's pending winnings (amount they can claim)
+    /// 
+    /// # Parameters
+    /// * `env` - The contract environment
+    /// * `user` - The address of the user
+    /// 
+    /// # Returns
+    /// Amount of vXLM the user can claim (0 if none)
+    pub fn get_pending_winnings(env: Env, user: Address) -> i128 {
+        let key = DataKey::PendingWinnings(user);
+        env.storage().persistent().get(&key).unwrap_or(0)
+    }
+    
+    /// Resolves a round with the final price and calculates winnings
     /// Only the oracle can call this function
     /// 
     /// # Parameters
@@ -166,8 +215,9 @@ impl VirtualTokenContract {
     /// 2. Get the active round
     /// 3. Compare final_price with price_start to determine winners
     /// 4. Calculate payouts proportionally for each winner
-    /// 5. Update all user balances
-    /// 6. Clear the round and positions
+    /// 5. Store pending winnings (users must claim later)
+    /// 6. Update user stats (wins, losses, streaks)
+    /// 7. Clear the round and positions
     /// 
     /// # Payout logic
     /// - If price went UP: UP bettors split the DOWN pool proportionally
@@ -202,13 +252,13 @@ impl VirtualTokenContract {
         // Handle the edge case: price didn't change
         if price_unchanged {
             // Return everyone's bets - no winners or losers
-            Self::_refund_all(&env, positions);
+            Self::_record_refunds(&env, positions);
         } else if price_went_up {
             // UP side wins - they split the DOWN pool
-            Self::_distribute_winnings(&env, positions, BetSide::Up, round.pool_up, round.pool_down);
+            Self::_record_winnings(&env, positions, BetSide::Up, round.pool_up, round.pool_down);
         } else if price_went_down {
             // DOWN side wins - they split the UP pool
-            Self::_distribute_winnings(&env, positions, BetSide::Down, round.pool_down, round.pool_up);
+            Self::_record_winnings(&env, positions, BetSide::Down, round.pool_down, round.pool_up);
         }
         
         // Clear the round and positions to prepare for the next round
@@ -216,30 +266,67 @@ impl VirtualTokenContract {
         env.storage().persistent().remove(&DataKey::Positions);
     }
     
-    /// Internal function to refund all bets (when price unchanged)
+    /// Claims pending winnings for a user
+    /// 
+    /// # Parameters
+    /// * `env` - The contract environment
+    /// * `user` - The address claiming winnings
+    /// 
+    /// # How it works
+    /// 1. Check if user has pending winnings
+    /// 2. Add winnings to user's balance
+    /// 3. Clear pending winnings
+    /// 
+    /// # Returns
+    /// Amount claimed (0 if no pending winnings)
+    pub fn claim_winnings(env: Env, user: Address) -> i128 {
+        // User must authorize the claim
+        user.require_auth();
+        
+        let key = DataKey::PendingWinnings(user.clone());
+        
+        // Get pending winnings
+        let pending: i128 = env.storage().persistent().get(&key).unwrap_or(0);
+        
+        if pending == 0 {
+            return 0;
+        }
+        
+        // Add winnings to user's balance
+        let current_balance = Self::balance(env.clone(), user.clone());
+        let new_balance = current_balance + pending;
+        Self::_set_balance(&env, user.clone(), new_balance);
+        
+        // Clear pending winnings
+        env.storage().persistent().remove(&key);
+        
+        pending
+    }
+    
+    /// Internal function to record refunds for all bets (when price unchanged)
     /// 
     /// # Parameters
     /// * `env` - The contract environment
     /// * `positions` - Map of all user positions
-    fn _refund_all(env: &Env, positions: Map<Address, UserPosition>) {
+    fn _record_refunds(env: &Env, positions: Map<Address, UserPosition>) {
         // Iterate through all positions
         let keys: Vec<Address> = positions.keys();
         
         for i in 0..keys.len() {
             if let Some(user) = keys.get(i) {
                 if let Some(position) = positions.get(user.clone()) {
-                    // Get current balance
-                    let current_balance = Self::balance(env.clone(), user.clone());
-                    // Add back the bet amount
-                    let new_balance = current_balance + position.amount;
-                    // Update balance
-                    Self::_set_balance(env, user, new_balance);
+                    // Record refund as pending winnings
+                    let key = DataKey::PendingWinnings(user.clone());
+                    let existing_pending: i128 = env.storage().persistent().get(&key).unwrap_or(0);
+                    env.storage().persistent().set(&key, &(existing_pending + position.amount));
+                    
+                    // No change to stats - this was a tie
                 }
             }
         }
     }
     
-    /// Internal function to distribute winnings to the winning side
+    /// Internal function to record winnings for the winning side
     /// 
     /// # Parameters
     /// * `env` - The contract environment
@@ -257,7 +344,7 @@ impl VirtualTokenContract {
     /// - Charlie bet 150 on DOWN (losing_pool = 150)
     /// - Alice gets: 100 + (100/300) * 150 = 100 + 50 = 150
     /// - Bob gets: 200 + (200/300) * 150 = 200 + 100 = 300
-    fn _distribute_winnings(
+    fn _record_winnings(
         env: &Env,
         positions: Map<Address, UserPosition>,
         winning_side: BetSide,
@@ -274,24 +361,67 @@ impl VirtualTokenContract {
         for i in 0..keys.len() {
             if let Some(user) = keys.get(i) {
                 if let Some(position) = positions.get(user.clone()) {
-                    // Only pay out winners
+                    // Check if this user won or lost
                     if position.side == winning_side {
-                        // Calculate proportional share of the losing pool
-                        // share = (user_bet / winning_pool) * losing_pool
+                        // WINNER - Calculate payout
                         let share = (position.amount * losing_pool) / winning_pool;
-                        
-                        // Total payout = original bet + share of losing pool
                         let payout = position.amount + share;
                         
-                        // Update user balance
-                        let current_balance = Self::balance(env.clone(), user.clone());
-                        let new_balance = current_balance + payout;
-                        Self::_set_balance(env, user, new_balance);
+                        // Store as pending winnings
+                        let key = DataKey::PendingWinnings(user.clone());
+                        let existing_pending: i128 = env.storage().persistent().get(&key).unwrap_or(0);
+                        env.storage().persistent().set(&key, &(existing_pending + payout));
+                        
+                        // Update user stats - they won!
+                        Self::_update_stats_win(env, user);
+                    } else {
+                        // LOSER - Update stats only
+                        Self::_update_stats_loss(env, user);
                     }
-                    // Losers get nothing - their bets are already gone
                 }
             }
         }
+    }
+    
+    /// Internal function to update user stats after a win
+    /// Increments wins, updates streak, records best streak
+    fn _update_stats_win(env: &Env, user: Address) {
+        let key = DataKey::UserStats(user);
+        let mut stats: UserStats = env.storage().persistent().get(&key).unwrap_or(UserStats {
+            total_wins: 0,
+            total_losses: 0,
+            current_streak: 0,
+            best_streak: 0,
+        });
+        
+        // Increment wins and streak
+        stats.total_wins += 1;
+        stats.current_streak += 1;
+        
+        // Update best streak if current streak is higher
+        if stats.current_streak > stats.best_streak {
+            stats.best_streak = stats.current_streak;
+        }
+        
+        env.storage().persistent().set(&key, &stats);
+    }
+    
+    /// Internal function to update user stats after a loss
+    /// Increments losses and resets streak
+    fn _update_stats_loss(env: &Env, user: Address) {
+        let key = DataKey::UserStats(user);
+        let mut stats: UserStats = env.storage().persistent().get(&key).unwrap_or(UserStats {
+            total_wins: 0,
+            total_losses: 0,
+            current_streak: 0,
+            best_streak: 0,
+        });
+        
+        // Increment losses and reset streak
+        stats.total_losses += 1;
+        stats.current_streak = 0;
+        
+        env.storage().persistent().set(&key, &stats);
     }
     
     /// Mints (creates) initial vXLM tokens for a user on their first interaction
@@ -583,12 +713,20 @@ mod test {
         // Resolve with SAME price (unchanged)
         client.resolve_round(&start_price);
         
-        // Both users should get their bets back
-        let user1_balance_after = client.balance(&user1);
-        let user2_balance_after = client.balance(&user2);
+        // Check pending winnings (not claimed yet)
+        assert_eq!(client.get_pending_winnings(&user1), 100_0000000);
+        assert_eq!(client.get_pending_winnings(&user2), 50_0000000);
         
-        assert_eq!(user1_balance_after, user1_balance_before + 100_0000000);
-        assert_eq!(user2_balance_after, user2_balance_before + 50_0000000);
+        // Claim winnings
+        let claimed1 = client.claim_winnings(&user1);
+        let claimed2 = client.claim_winnings(&user2);
+        
+        assert_eq!(claimed1, 100_0000000);
+        assert_eq!(claimed2, 50_0000000);
+        
+        // Both users should get their bets back
+        assert_eq!(client.balance(&user1), user1_balance_before + 100_0000000);
+        assert_eq!(client.balance(&user2), user2_balance_before + 50_0000000);
         
         // Round should be cleared
         assert_eq!(client.get_active_round(), None);
@@ -651,10 +789,23 @@ mod test {
         // Resolve with HIGHER price (1.5 XLM - price went UP)
         client.resolve_round(&1_5000000);
         
-        // Calculate expected payouts:
-        // Alice: 100 + (100/300) * 150 = 100 + 50 = 150
-        // Bob: 200 + (200/300) * 150 = 200 + 100 = 300
-        // Charlie: 0 (lost)
+        // Check pending winnings
+        assert_eq!(client.get_pending_winnings(&alice), 150_0000000);
+        assert_eq!(client.get_pending_winnings(&bob), 300_0000000);
+        assert_eq!(client.get_pending_winnings(&charlie), 0); // Lost
+        
+        // Check stats: Alice and Bob won, Charlie lost
+        let alice_stats = client.get_user_stats(&alice);
+        assert_eq!(alice_stats.total_wins, 1);
+        assert_eq!(alice_stats.current_streak, 1);
+        
+        let charlie_stats = client.get_user_stats(&charlie);
+        assert_eq!(charlie_stats.total_losses, 1);
+        assert_eq!(charlie_stats.current_streak, 0);
+        
+        // Claim winnings
+        client.claim_winnings(&alice);
+        client.claim_winnings(&bob);
         
         assert_eq!(client.balance(&alice), alice_before + 150_0000000);
         assert_eq!(client.balance(&bob), bob_before + 300_0000000);
@@ -709,11 +860,81 @@ mod test {
         // Resolve with LOWER price (1.0 XLM - price went DOWN)
         client.resolve_round(&1_0000000);
         
+        // Check pending winnings
+        assert_eq!(client.get_pending_winnings(&alice), 300_0000000);
+        assert_eq!(client.get_pending_winnings(&bob), 0);
+        
         // Alice wins: 200 + (200/200) * 100 = 200 + 100 = 300
-        // Bob loses: 0
+        client.claim_winnings(&alice);
         
         assert_eq!(client.balance(&alice), alice_before + 300_0000000);
         assert_eq!(client.balance(&bob), bob_before); // No change (lost)
+    }
+    
+    #[test]
+    fn test_claim_winnings_when_none() {
+        let env = Env::default();
+        let contract_id = env.register(VirtualTokenContract, ());
+        let client = VirtualTokenContractClient::new(&env, &contract_id);
+        
+        let user = Address::generate(&env);
+        env.mock_all_auths();
+        
+        // Try to claim with no pending winnings
+        let claimed = client.claim_winnings(&user);
+        assert_eq!(claimed, 0);
+    }
+    
+    #[test]
+    fn test_user_stats_tracking() {
+        let env = Env::default();
+        let contract_id = env.register(VirtualTokenContract, ());
+        let client = VirtualTokenContractClient::new(&env, &contract_id);
+        
+        let admin = Address::generate(&env);
+        let oracle = Address::generate(&env);
+        let alice = Address::generate(&env);
+        
+        env.mock_all_auths();
+        client.initialize(&admin, &oracle);
+        
+        // Initial stats should be all zeros
+        let stats = client.get_user_stats(&alice);
+        assert_eq!(stats.total_wins, 0);
+        assert_eq!(stats.total_losses, 0);
+        assert_eq!(stats.current_streak, 0);
+        assert_eq!(stats.best_streak, 0);
+        
+        // Simulate a win
+        env.as_contract(&contract_id, || {
+            VirtualTokenContract::_update_stats_win(&env, alice.clone());
+        });
+        
+        let stats = client.get_user_stats(&alice);
+        assert_eq!(stats.total_wins, 1);
+        assert_eq!(stats.current_streak, 1);
+        assert_eq!(stats.best_streak, 1);
+        
+        // Another win - streak increases
+        env.as_contract(&contract_id, || {
+            VirtualTokenContract::_update_stats_win(&env, alice.clone());
+        });
+        
+        let stats = client.get_user_stats(&alice);
+        assert_eq!(stats.total_wins, 2);
+        assert_eq!(stats.current_streak, 2);
+        assert_eq!(stats.best_streak, 2);
+        
+        // A loss - streak resets
+        env.as_contract(&contract_id, || {
+            VirtualTokenContract::_update_stats_loss(&env, alice.clone());
+        });
+        
+        let stats = client.get_user_stats(&alice);
+        assert_eq!(stats.total_wins, 2);
+        assert_eq!(stats.total_losses, 1);
+        assert_eq!(stats.current_streak, 0); // Reset
+        assert_eq!(stats.best_streak, 2); // Best remains
     }
     
     #[test]
