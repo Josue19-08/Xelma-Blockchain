@@ -1,9 +1,32 @@
 {
-  "version": "0.0.0",
-  "name": "bindings",
+  "name": "@tevalabs/xelma-bindings",
+  "version": "1.0.0",
+  "description": "TypeScript bindings for Xelma prediction market smart contract on Stellar/Soroban",
+  "author": "TevaLabs",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TevaLabs/Xelma-Blockchain.git",
+    "directory": "bindings"
+  },
+  "keywords": [
+    "stellar",
+    "soroban",
+    "smart-contract",
+    "prediction-market",
+    "blockchain",
+    "xlm",
+    "typescript",
+    "bindings"
+  ],
   "type": "module",
   "exports": "./dist/index.js",
   "typings": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc"
   },
