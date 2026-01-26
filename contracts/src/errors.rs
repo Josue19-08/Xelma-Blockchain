@@ -33,5 +33,9 @@ pub enum ContractError {
     InvalidPrice = 12,
     /// Invalid duration value
     InvalidDuration = 13,
+    /// Invalid round mode (must be 0 or 1)
+    InvalidMode = 14,
+    /// Wrong prediction type for current round mode
+    WrongModeForPrediction = 15,
 }
 
