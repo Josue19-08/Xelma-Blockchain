@@ -5,4 +5,5 @@ mod betting;
 mod resolution;
 mod lifecycle;
 mod edge_cases;
+mod mode_tests;
 

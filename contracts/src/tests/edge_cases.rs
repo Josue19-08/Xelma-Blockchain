@@ -18,7 +18,7 @@ fn test_round_with_no_participants() {
     client.initialize(&admin, &oracle);
     
     // Create round with no bets
-    client.create_round(&1_0000000, &100);
+    client.create_round(&1_0000000, &100, &None);
     
     let round = client.get_active_round().unwrap();
     assert_eq!(round.pool_up, 0);
@@ -49,7 +49,7 @@ fn test_round_with_only_one_side() {
     client.mint_initial(&bob);
     
     // Create round and only bet on UP
-    client.create_round(&1_0000000, &100);
+    client.create_round(&1_0000000, &100, &None);
     client.place_bet(&alice, &100_0000000, &BetSide::Up);
     client.place_bet(&bob, &150_0000000, &BetSide::Up);
     
@@ -81,7 +81,7 @@ fn test_accumulate_pending_winnings() {
     client.mint_initial(&alice);
     
     // Round 1: Alice bets UP and wins
-    client.create_round(&1_0000000, &100);
+    client.create_round(&1_0000000, &100, &None);
     client.place_bet(&alice, &100_0000000, &BetSide::Up);
     
     env.as_contract(&contract_id, || {
@@ -104,7 +104,7 @@ fn test_accumulate_pending_winnings() {
     assert!(first_pending > 0);
     
     // Round 2: Alice bets and gets refund
-    client.create_round(&2_0000000, &100);
+    client.create_round(&2_0000000, &100, &None);
     client.place_bet(&alice, &50_0000000, &BetSide::Down);
     
     client.resolve_round(&2_0000000); // Price unchanged - refund

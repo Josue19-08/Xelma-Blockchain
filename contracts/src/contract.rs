@@ -1,9 +1,9 @@
 //! Core contract implementation for the XLM Price Prediction Market.
 
-use soroban_sdk::{contract, contractimpl, Address, Env, Map, Vec};
+use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Map, Vec};
 
 use crate::errors::ContractError;
-use crate::types::{BetSide, DataKey, Round, UserPosition, UserStats};
+use crate::types::{BetSide, DataKey, PrecisionPrediction, Round, RoundMode, UserPosition, UserStats};
 
 #[contract]
 pub struct VirtualTokenContract;
@@ -25,36 +25,62 @@ impl VirtualTokenContract {
     }
     
     /// Creates a new prediction round (admin only)
-    pub fn create_round(env: Env, start_price: u128, duration_ledgers: u32) -> Result<(), ContractError> {
+    /// mode: 0 = Up/Down (default), 1 = Precision (Legends)
+    pub fn create_round(env: Env, start_price: u128, duration_ledgers: u32, mode: Option<u32>) -> Result<(), ContractError> {
         if start_price == 0 {
             return Err(ContractError::InvalidPrice);
         }
-        
+
         if duration_ledgers == 0 || duration_ledgers > 100_000 {
             return Err(ContractError::InvalidDuration);
         }
-        
+
+        // Default to Up/Down mode (0) if not specified
+        let mode_value = mode.unwrap_or(0);
+
+        // Validate mode is either 0 or 1
+        if mode_value > 1 {
+            return Err(ContractError::InvalidMode);
+        }
+
+        let round_mode = if mode_value == 0 {
+            RoundMode::UpDown
+        } else {
+            RoundMode::Precision
+        };
+
         let admin: Address = env.storage()
             .persistent()
             .get(&DataKey::Admin)
             .ok_or(ContractError::AdminNotSet)?;
-        
+
         admin.require_auth();
-        
+
         let current_ledger = env.ledger().sequence();
         let end_ledger = current_ledger
             .checked_add(duration_ledgers)
             .ok_or(ContractError::Overflow)?;
-        
+
         let round = Round {
             price_start: start_price,
             end_ledger,
             pool_up: 0,
             pool_down: 0,
+            mode: round_mode.clone(),
         };
-        
+
         env.storage().persistent().set(&DataKey::ActiveRound, &round);
-        
+
+        // Clear previous round's positions based on mode
+        env.storage().persistent().remove(&DataKey::UpDownPositions);
+        env.storage().persistent().remove(&DataKey::PrecisionPositions);
+
+        // Emit round creation event with mode
+        env.events().publish(
+            (symbol_short!("round"), symbol_short!("created")),
+            (start_price, end_ledger, mode_value),
+        );
+
         Ok(())
     }
     
@@ -88,49 +114,55 @@ impl VirtualTokenContract {
         env.storage().persistent().get(&key).unwrap_or(0)
     }
     
-    /// Places a bet on the active round
+    /// Places a bet on the active round (Up/Down mode only)
     pub fn place_bet(env: Env, user: Address, amount: i128, side: BetSide) -> Result<(), ContractError> {
         user.require_auth();
-        
+
         if amount <= 0 {
             return Err(ContractError::InvalidBetAmount);
         }
-        
+
         let mut round: Round = env.storage()
             .persistent()
             .get(&DataKey::ActiveRound)
             .ok_or(ContractError::NoActiveRound)?;
-        
+
+        // Verify round is in Up/Down mode
+        if round.mode != RoundMode::UpDown {
+            return Err(ContractError::WrongModeForPrediction);
+        }
+
         let current_ledger = env.ledger().sequence();
         if current_ledger >= round.end_ledger {
             return Err(ContractError::RoundEnded);
         }
-        
+
         let user_balance = Self::balance(env.clone(), user.clone());
         if user_balance < amount {
             return Err(ContractError::InsufficientBalance);
         }
-        
+
+        // Use UpDownPositions storage for Up/Down mode
         let mut positions: Map<Address, UserPosition> = env.storage()
             .persistent()
-            .get(&DataKey::Positions)
+            .get(&DataKey::UpDownPositions)
             .unwrap_or(Map::new(&env));
-        
+
         if positions.contains_key(user.clone()) {
             return Err(ContractError::AlreadyBet);
         }
-        
+
         let new_balance = user_balance
             .checked_sub(amount)
             .ok_or(ContractError::Overflow)?;
         Self::_set_balance(&env, user.clone(), new_balance);
-        
+
         let position = UserPosition {
             amount,
             side: side.clone(),
         };
-        positions.set(user, position);
-        
+        positions.set(user.clone(), position);
+
         match side {
             BetSide::Up => {
                 round.pool_up = round.pool_up
@@ -143,21 +175,129 @@ impl VirtualTokenContract {
                     .ok_or(ContractError::Overflow)?;
             },
         }
-        
-        env.storage().persistent().set(&DataKey::Positions, &positions);
+
+        env.storage().persistent().set(&DataKey::UpDownPositions, &positions);
         env.storage().persistent().set(&DataKey::ActiveRound, &round);
-        
-        Ok(())
-    }
-    
-    /// Returns user's position in the current round
-    pub fn get_user_position(env: Env, user: Address) -> Option<UserPosition> {
-        let positions: Map<Address, UserPosition> = env.storage()
+
+        // Also keep legacy Positions storage for backwards compatibility
+        let mut legacy_positions: Map<Address, UserPosition> = env.storage()
             .persistent()
             .get(&DataKey::Positions)
             .unwrap_or(Map::new(&env));
-        
+        legacy_positions.set(user, UserPosition { amount, side });
+        env.storage().persistent().set(&DataKey::Positions, &legacy_positions);
+
+        Ok(())
+    }
+
+    /// Places a precision prediction on the active round (Precision/Legends mode only)
+    /// predicted_price: price scaled to 4 decimals (e.g., 0.2297 → 2297)
+    pub fn place_precision_prediction(
+        env: Env,
+        user: Address,
+        amount: i128,
+        predicted_price: u128,
+    ) -> Result<(), ContractError> {
+        user.require_auth();
+
+        if amount <= 0 {
+            return Err(ContractError::InvalidBetAmount);
+        }
+
+        let round: Round = env.storage()
+            .persistent()
+            .get(&DataKey::ActiveRound)
+            .ok_or(ContractError::NoActiveRound)?;
+
+        // Verify round is in Precision mode
+        if round.mode != RoundMode::Precision {
+            return Err(ContractError::WrongModeForPrediction);
+        }
+
+        let current_ledger = env.ledger().sequence();
+        if current_ledger >= round.end_ledger {
+            return Err(ContractError::RoundEnded);
+        }
+
+        let user_balance = Self::balance(env.clone(), user.clone());
+        if user_balance < amount {
+            return Err(ContractError::InsufficientBalance);
+        }
+
+        // Check if user already has a prediction in this round
+        let mut predictions: Vec<PrecisionPrediction> = env.storage()
+            .persistent()
+            .get(&DataKey::PrecisionPositions)
+            .unwrap_or(Vec::new(&env));
+
+        for i in 0..predictions.len() {
+            if let Some(pred) = predictions.get(i) {
+                if pred.user == user {
+                    return Err(ContractError::AlreadyBet);
+                }
+            }
+        }
+
+        // Deduct balance
+        let new_balance = user_balance
+            .checked_sub(amount)
+            .ok_or(ContractError::Overflow)?;
+        Self::_set_balance(&env, user.clone(), new_balance);
+
+        // Store prediction
+        let prediction = PrecisionPrediction {
+            user,
+            predicted_price,
+            amount,
+        };
+        predictions.push_back(prediction);
+
+        env.storage().persistent().set(&DataKey::PrecisionPositions, &predictions);
+
+        Ok(())
+    }
+    
+    /// Returns user's position in the current round (Up/Down mode)
+    pub fn get_user_position(env: Env, user: Address) -> Option<UserPosition> {
+        let positions: Map<Address, UserPosition> = env.storage()
+            .persistent()
+            .get(&DataKey::UpDownPositions)
+            .unwrap_or(Map::new(&env));
+
         positions.get(user)
+    }
+
+    /// Returns user's precision prediction in the current round (Precision mode)
+    pub fn get_user_precision_prediction(env: Env, user: Address) -> Option<PrecisionPrediction> {
+        let predictions: Vec<PrecisionPrediction> = env.storage()
+            .persistent()
+            .get(&DataKey::PrecisionPositions)
+            .unwrap_or(Vec::new(&env));
+
+        for i in 0..predictions.len() {
+            if let Some(pred) = predictions.get(i) {
+                if pred.user == user {
+                    return Some(pred);
+                }
+            }
+        }
+        None
+    }
+
+    /// Returns all precision predictions for the current round
+    pub fn get_precision_predictions(env: Env) -> Vec<PrecisionPrediction> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::PrecisionPositions)
+            .unwrap_or(Vec::new(&env))
+    }
+
+    /// Returns all Up/Down positions for the current round
+    pub fn get_updown_positions(env: Env) -> Map<Address, UserPosition> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::UpDownPositions)
+            .unwrap_or(Map::new(&env))
     }
     
     /// Resolves the round with final price (oracle only)
@@ -198,7 +338,9 @@ impl VirtualTokenContract {
         
         env.storage().persistent().remove(&DataKey::ActiveRound);
         env.storage().persistent().remove(&DataKey::Positions);
-        
+        env.storage().persistent().remove(&DataKey::UpDownPositions);
+        env.storage().persistent().remove(&DataKey::PrecisionPositions);
+
         Ok(())
     }
     

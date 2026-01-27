@@ -19,7 +19,7 @@ fn test_resolve_round_price_unchanged() {
     
     // Create a round with start price 1.5 XLM
     let start_price: u128 = 1_5000000;
-    client.create_round(&start_price, &60);
+    client.create_round(&start_price, &60, &None);
     
     // Manually set up some test positions using env.as_contract
     let user1 = Address::generate(&env);
@@ -91,7 +91,7 @@ fn test_resolve_round_price_went_up() {
     
     // Create a round with start price 1.0 XLM
     let start_price: u128 = 1_0000000;
-    client.create_round(&start_price, &60);
+    client.create_round(&start_price, &60, &None);
     
     // Set up test users
     let alice = Address::generate(&env);
@@ -171,7 +171,7 @@ fn test_resolve_round_price_went_down() {
     
     // Create a round with start price 2.0 XLM
     let start_price: u128 = 2_0000000;
-    client.create_round(&start_price, &60);
+    client.create_round(&start_price, &60, &None);
     
     let alice = Address::generate(&env);
     let bob = Address::generate(&env);
