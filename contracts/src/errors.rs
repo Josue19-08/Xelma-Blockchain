@@ -39,5 +39,7 @@ pub enum ContractError {
     WrongModeForPrediction = 15,
     /// Round has not reached end_ledger yet
     RoundNotEnded = 16,
+    /// Invalid price scale (must represent 4 decimal places)
+    InvalidPriceScale = 17,
 }
 

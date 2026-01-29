@@ -91,6 +91,7 @@ impl VirtualTokenContract {
         env.storage().persistent().remove(&DataKey::PrecisionPositions);
 
         // Emit round creation event with mode
+        #[allow(deprecated)]
         env.events().publish(
             (symbol_short!("round"), symbol_short!("created")),
             (start_price, bet_end_ledger, end_ledger, mode_value),
@@ -137,6 +138,7 @@ impl VirtualTokenContract {
         env.storage().persistent().set(&DataKey::RunWindowLedgers, &run_ledgers);
         
         // Emit event
+        #[allow(deprecated)]
         env.events().publish(
             (symbol_short!("windows"), symbol_short!("updated")),
             (bet_ledgers, run_ledgers),
@@ -252,6 +254,12 @@ impl VirtualTokenContract {
             return Err(ContractError::InvalidBetAmount);
         }
 
+        // Validate price scale (must be 4 decimal places, max value 9999 for 0.9999)
+        // Reasonable max: 99999999 (9999.9999 XLM)
+        if predicted_price > 99_999_999 {
+            return Err(ContractError::InvalidPriceScale);
+        }
+
         let round: Round = env.storage()
             .persistent()
             .get(&DataKey::ActiveRound)
@@ -294,7 +302,7 @@ impl VirtualTokenContract {
 
         // Store prediction
         let prediction = PrecisionPrediction {
-            user,
+            user: user.clone(),
             predicted_price,
             amount,
         };
@@ -302,7 +310,25 @@ impl VirtualTokenContract {
 
         env.storage().persistent().set(&DataKey::PrecisionPositions, &predictions);
 
+        // Emit event for precision prediction
+        #[allow(deprecated)]
+        env.events().publish(
+            (symbol_short!("predict"), symbol_short!("price")),
+            (user, predicted_price, round.start_ledger),
+        );
+
         Ok(())
+    }
+
+    /// Alias for place_precision_prediction - allows users to submit exact price predictions
+    /// guessed_price: price scaled to 4 decimals (e.g., 0.2297 → 2297)
+    pub fn predict_price(
+        env: Env,
+        user: Address,
+        guessed_price: u128,
+        amount: i128,
+    ) -> Result<(), ContractError> {
+        Self::place_precision_prediction(env, user, amount, guessed_price)
     }
     
     /// Returns user's position in the current round (Up/Down mode)

@@ -3,7 +3,7 @@
 use crate::contract::{VirtualTokenContract, VirtualTokenContractClient};
 use crate::errors::ContractError;
 use crate::types::{BetSide, RoundMode};
-use soroban_sdk::{testutils::{Address as _, Ledger as _}, Address, Env};
+use soroban_sdk::{testutils::{Address as _, Ledger as _, Events}, Address, Env};
 
 #[test]
 fn test_create_round_default_mode() {
@@ -372,3 +372,131 @@ fn test_precision_invalid_amount() {
     let result = client.try_place_precision_prediction(&user, &-100, &2297);
     assert_eq!(result, Err(Ok(ContractError::InvalidBetAmount)));
 }
+
+#[test]
+fn test_predict_price_alias() {
+    let env = Env::default();
+    let contract_id = env.register(VirtualTokenContract, ());
+    let client = VirtualTokenContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let oracle = Address::generate(&env);
+    let user = Address::generate(&env);
+
+    env.mock_all_auths();
+
+    client.initialize(&admin, &oracle);
+    client.mint_initial(&user);
+
+    // Create Precision round
+    client.create_round(&1_0000000, &Some(1));
+
+    // Use predict_price function (alias with different parameter order)
+    client.predict_price(&user, &2297, &100_0000000);
+
+    // Verify the prediction was stored
+    let prediction = client.get_user_precision_prediction(&user).unwrap();
+    assert_eq!(prediction.amount, 100_0000000);
+    assert_eq!(prediction.predicted_price, 2297);
+
+    // Verify balance was deducted
+    assert_eq!(client.balance(&user), 900_0000000);
+}
+
+#[test]
+fn test_predict_price_valid_scales() {
+    let env = Env::default();
+    let contract_id = env.register(VirtualTokenContract, ());
+    let client = VirtualTokenContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let oracle = Address::generate(&env);
+
+    env.mock_all_auths();
+
+    client.initialize(&admin, &oracle);
+
+    // Test various valid price scales (4 decimal places)
+    let test_cases = [
+        1u128,        // 0.0001 XLM
+        2297u128,     // 0.2297 XLM
+        10000u128,    // 1.0000 XLM
+        50000u128,    // 5.0000 XLM
+        99999999u128, // 9999.9999 XLM (max valid)
+    ];
+
+    for price in test_cases.iter() {
+        let user = Address::generate(&env);
+        client.mint_initial(&user);
+        
+        // Create new round for each test
+        client.create_round(&1_0000000, &Some(1));
+        
+        // Should succeed with valid price scale
+        client.predict_price(&user, price, &100_0000000);
+        
+        let prediction = client.get_user_precision_prediction(&user).unwrap();
+        assert_eq!(prediction.predicted_price, *price);
+        
+        // Clean up for next iteration
+        env.ledger().with_mut(|li| {
+            li.sequence_number += 20;
+        });
+    }
+}
+
+#[test]
+fn test_predict_price_invalid_scale() {
+    let env = Env::default();
+    let contract_id = env.register(VirtualTokenContract, ());
+    let client = VirtualTokenContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let oracle = Address::generate(&env);
+    let user = Address::generate(&env);
+
+    env.mock_all_auths();
+
+    client.initialize(&admin, &oracle);
+    client.mint_initial(&user);
+
+    // Create Precision round
+    client.create_round(&1_0000000, &Some(1));
+
+    // Try to predict with price exceeding max scale (> 9999.9999)
+    let result = client.try_predict_price(&user, &100_000_000, &100_0000000);
+    assert_eq!(result, Err(Ok(ContractError::InvalidPriceScale)));
+
+    // Try with extremely large value
+    let result = client.try_predict_price(&user, &999_999_999_999, &100_0000000);
+    assert_eq!(result, Err(Ok(ContractError::InvalidPriceScale)));
+}
+
+#[test]
+fn test_predict_price_event_emission() {
+    let env = Env::default();
+    let contract_id = env.register(VirtualTokenContract, ());
+    let client = VirtualTokenContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let oracle = Address::generate(&env);
+    let user = Address::generate(&env);
+
+    env.mock_all_auths();
+
+    client.initialize(&admin, &oracle);
+    client.mint_initial(&user);
+
+    // Create Precision round at ledger 0
+    client.create_round(&1_0000000, &Some(1));
+
+    // Place prediction
+    client.predict_price(&user, &2297, &100_0000000);
+
+    // Verify event was emitted
+    let events = env.events().all();
+    
+    // Should have events (at least the prediction event)
+    assert!(events.len() > 0);
+}
+
