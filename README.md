@@ -2,7 +2,7 @@
 
 [![Rust](https://img.shields.io/badge/Rust-1.92.0-orange.svg)](https://www.rust-lang.org/)
 [![Soroban](https://img.shields.io/badge/Soroban-23.4.0-blue.svg)](https://soroban.stellar.org/)
-[![Tests](https://img.shields.io/badge/tests-26%2F26%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-55%2F55%20passing-brightgreen.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 > A trustless, transparent, and decentralized prediction market for XLM price movements built on Stellar blockchain using Soroban smart contracts.
@@ -11,7 +11,11 @@
 
 ## 🎯 What is Xelma?
 
-**Xelma** is a blockchain-based prediction market that allows users to bet on whether the price of Stellar Lumens (XLM) will go **UP** or **DOWN** within a specific time frame. Unlike traditional prediction markets, Xelma is:
+**Xelma** is a blockchain-based prediction market with dual prediction modes:
+- **Up/Down Mode**: Bet on whether XLM price will go UP or DOWN
+- **Precision Mode (Legends)**: Predict the exact price - closest guess wins!
+
+Unlike traditional prediction markets, Xelma is:
 
 - 🔓 **Permissionless** - Anyone with a Stellar wallet can participate
 - 🔍 **Transparent** - All bets, rounds, and payouts are verifiable on-chain
@@ -74,12 +78,14 @@
 │  • Track balances on-chain                              │
 │                                                          │
 │  [Round Management]                                      │
-│  • Admin creates rounds (start price + duration)        │
-│  • Users place bets (amount + side: UP/DOWN)           │
+│  • Admin creates rounds (start price + mode + duration) │
+│  • Mode 0 (Up/Down): Bet UP or DOWN                     │
+│  • Mode 1 (Precision): Predict exact price              │
 │  • Oracle resolves rounds (final price)                 │
 │                                                          │
-│  [Payout Logic]                                         │
-│  • Winners split losers' pool proportionally            │
+│  [Payout Logic - Dual Mode]                             │
+│  • Up/Down: Winners split losers' pool proportionally   │
+│  • Precision: Closest guess wins full pot (ties split)  │
 │  • Unchanged price → everyone gets refund               │
 │  • Claim-based withdrawal (user controlled)             │
 │                                                          │
@@ -119,7 +125,7 @@
 - **Language**: Rust 1.92.0
 - **Framework**: Soroban SDK 23.4.0
 - **Blockchain**: Stellar (Testnet)
-- **Testing**: 26/26 tests passing (100% coverage)
+- **Testing**: 55/55 tests passing (100% coverage)
 
 ### Key Features:
 - ✅ Custom error handling (13 error types)
@@ -193,7 +199,7 @@ cargo build --target wasm32-unknown-unknown --release
 
 ```bash
 cargo test
-# Output: 26 passed; 0 failed
+# Output: 55 passed; 0 failed
 ```
 
 ### 4. Generate & Build Bindings
@@ -249,7 +255,7 @@ We take security seriously. The contract has undergone comprehensive hardening:
 - ✅ **Input Validation** - All parameters validated (amount > 0, round active, etc.)
 - ✅ **No Reentrancy Risk** - CEI pattern (Checks-Effects-Interactions)
 - ✅ **State Consistency** - Prevents double betting, validates round lifecycle
-- ✅ **26/26 Tests Passing** - Full coverage of edge cases and attack vectors
+- ✅ **55/55 Tests Passing** - Full coverage of edge cases and attack vectors
 
 ### Audited:
 - [SECURITY_REVIEW.md](./SECURITY_REVIEW.md) - Complete security analysis
@@ -264,23 +270,28 @@ We take security seriously. The contract has undergone comprehensive hardening:
 ### User Functions:
 - `mint_initial(user)` - Get 1000 vXLM on first use
 - `balance(user)` - Query current balance
-- `place_bet(user, amount, side)` - Bet on UP or DOWN
+- `place_bet(user, amount, side)` - Bet on UP or DOWN (Mode 0)
+- `place_precision_prediction(user, amount, predicted_price)` - Predict exact price (Mode 1)
 - `claim_winnings(user)` - Withdraw pending winnings
 - `get_user_stats(user)` - View wins, losses, streaks
-- `get_user_position(user)` - Check bet in current round
+- `get_user_position(user)` - Check bet in current round (Mode 0)
+- `get_user_precision_prediction(user)` - Check prediction in current round (Mode 1)
 
 ### Admin Functions:
 - `initialize(admin, oracle)` - One-time contract setup
-- `create_round(start_price, duration)` - Start new betting round
+- `create_round(start_price, mode)` - Start new betting round (mode: 0=Up/Down, 1=Precision)
+- `set_windows(bet_ledgers, run_ledgers)` - Configure round timing windows
 
 ### Oracle Functions:
 - `resolve_round(final_price)` - Resolve round and trigger payouts
 
 ### Query Functions:
-- `get_active_round()` - View current round details
+- `get_active_round()` - View current round details (includes mode)
 - `get_admin()` - Query admin address
 - `get_oracle()` - Query oracle address
 - `get_pending_winnings(user)` - Check claimable amount
+- `get_precision_predictions()` - View all predictions in current Precision round
+- `get_updown_positions()` - View all positions in current Up/Down round
 
 ---
 
@@ -308,11 +319,12 @@ We take security seriously. The contract has undergone comprehensive hardening:
 
 ### ✅ Phase 1: Core Contract (Completed)
 - [x] Virtual token system
-- [x] Round management
-- [x] Betting mechanism
-- [x] Proportional payouts
-- [x] User statistics
-- [x] Comprehensive testing (26/26)
+- [x] Dual-mode round management (Up/Down + Precision)
+- [x] Hybrid resolution logic
+- [x] Up/Down betting mechanism with proportional payouts
+- [x] Precision prediction mechanism (closest guess wins)
+- [x] User statistics tracking
+- [x] Comprehensive testing (55/55)
 - [x] Security hardening
 - [x] TypeScript bindings
 

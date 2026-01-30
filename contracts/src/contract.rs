@@ -375,55 +375,171 @@ impl VirtualTokenContract {
     }
     
     /// Resolves the round with final price (oracle only)
-    /// Winners split losers' pool proportionally; ties get refunds
+    /// Mode 0 (Up/Down): Winners split losers' pool proportionally; ties get refunds
+    /// Mode 1 (Precision/Legends): Closest guess wins full pot; ties split evenly
     pub fn resolve_round(env: Env, final_price: u128) -> Result<(), ContractError> {
         if final_price == 0 {
             return Err(ContractError::InvalidPrice);
         }
-        
+
         let oracle: Address = env.storage()
             .persistent()
             .get(&DataKey::Oracle)
             .ok_or(ContractError::OracleNotSet)?;
-        
+
         oracle.require_auth();
-        
+
         let round: Round = env.storage()
             .persistent()
             .get(&DataKey::ActiveRound)
             .ok_or(ContractError::NoActiveRound)?;
-        
+
         // Verify round has reached end_ledger
         let current_ledger = env.ledger().sequence();
         if current_ledger < round.end_ledger {
             return Err(ContractError::RoundNotEnded);
         }
-        
-        let positions: Map<Address, UserPosition> = env.storage()
-            .persistent()
-            .get(&DataKey::Positions)
-            .unwrap_or(Map::new(&env));
-        
-        let price_went_up = final_price > round.price_start;
-        let price_went_down = final_price < round.price_start;
-        let price_unchanged = final_price == round.price_start;
-        
-        if price_unchanged {
-            Self::_record_refunds(&env, positions)?;
-        } else if price_went_up {
-            Self::_record_winnings(&env, positions, BetSide::Up, round.pool_up, round.pool_down)?;
-        } else if price_went_down {
-            Self::_record_winnings(&env, positions, BetSide::Down, round.pool_down, round.pool_up)?;
+
+        // Branch based on round mode
+        match round.mode {
+            RoundMode::UpDown => {
+                Self::_resolve_updown_mode(&env, &round, final_price)?;
+            },
+            RoundMode::Precision => {
+                Self::_resolve_precision_mode(&env, final_price)?;
+            },
         }
-        
+
+        // Clean up storage
         env.storage().persistent().remove(&DataKey::ActiveRound);
         env.storage().persistent().remove(&DataKey::Positions);
         env.storage().persistent().remove(&DataKey::UpDownPositions);
         env.storage().persistent().remove(&DataKey::PrecisionPositions);
 
+        // Emit resolution event
+        env.events().publish(
+            (symbol_short!("round"), symbol_short!("resolved")),
+            final_price,
+        );
+
         Ok(())
     }
-    
+
+    /// Resolves Up/Down mode round
+    fn _resolve_updown_mode(env: &Env, round: &Round, final_price: u128) -> Result<(), ContractError> {
+        let positions: Map<Address, UserPosition> = env.storage()
+            .persistent()
+            .get(&DataKey::UpDownPositions)
+            .unwrap_or(Map::new(env));
+
+        let price_went_up = final_price > round.price_start;
+        let price_went_down = final_price < round.price_start;
+        let price_unchanged = final_price == round.price_start;
+
+        if price_unchanged {
+            Self::_record_refunds(env, positions)?;
+        } else if price_went_up {
+            Self::_record_winnings(env, positions, BetSide::Up, round.pool_up, round.pool_down)?;
+        } else if price_went_down {
+            Self::_record_winnings(env, positions, BetSide::Down, round.pool_down, round.pool_up)?;
+        }
+
+        Ok(())
+    }
+
+    /// Resolves Precision/Legends mode round
+    /// Awards full pot to closest guess(es); ties split evenly
+    fn _resolve_precision_mode(env: &Env, final_price: u128) -> Result<(), ContractError> {
+        let predictions: Vec<PrecisionPrediction> = env.storage()
+            .persistent()
+            .get(&DataKey::PrecisionPositions)
+            .unwrap_or(Vec::new(env));
+
+        // If no predictions, nothing to resolve
+        if predictions.is_empty() {
+            return Ok(());
+        }
+
+        // Find minimum difference and collect all winners
+        let mut min_diff: Option<u128> = None;
+        let mut winners: Vec<PrecisionPrediction> = Vec::new(env);
+
+        for i in 0..predictions.len() {
+            if let Some(pred) = predictions.get(i) {
+                // Calculate absolute difference using checked arithmetic
+                let diff = if pred.predicted_price >= final_price {
+                    pred.predicted_price
+                        .checked_sub(final_price)
+                        .ok_or(ContractError::Overflow)?
+                } else {
+                    final_price
+                        .checked_sub(pred.predicted_price)
+                        .ok_or(ContractError::Overflow)?
+                };
+
+                match min_diff {
+                    None => {
+                        // First prediction
+                        min_diff = Some(diff);
+                        winners.push_back(pred.clone());
+                    },
+                    Some(current_min) => {
+                        if diff < current_min {
+                            // New winner found, clear previous winners
+                            min_diff = Some(diff);
+                            winners = Vec::new(env);
+                            winners.push_back(pred.clone());
+                        } else if diff == current_min {
+                            // Tie - add to winners
+                            winners.push_back(pred.clone());
+                        }
+                    },
+                }
+            }
+        }
+
+        // Calculate total pot
+        let mut total_pot: i128 = 0;
+        for i in 0..predictions.len() {
+            if let Some(pred) = predictions.get(i) {
+                total_pot = total_pot
+                    .checked_add(pred.amount)
+                    .ok_or(ContractError::Overflow)?;
+            }
+        }
+
+        // Distribute winnings to winner(s)
+        if !winners.is_empty() && total_pot > 0 {
+            let winner_count = winners.len() as i128;
+            let payout_per_winner = total_pot / winner_count;
+
+            for i in 0..winners.len() {
+                if let Some(winner) = winners.get(i) {
+                    let key = DataKey::PendingWinnings(winner.user.clone());
+                    let existing_pending: i128 = env.storage().persistent().get(&key).unwrap_or(0);
+                    let new_pending = existing_pending
+                        .checked_add(payout_per_winner)
+                        .ok_or(ContractError::Overflow)?;
+                    env.storage().persistent().set(&key, &new_pending);
+
+                    Self::_update_stats_win(env, winner.user.clone());
+                }
+            }
+
+            // Update stats for losers
+            for i in 0..predictions.len() {
+                if let Some(pred) = predictions.get(i) {
+                    let is_winner = winners.iter().any(|w| w.user == pred.user);
+                    if !is_winner {
+                        Self::_update_stats_loss(env, pred.user.clone());
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     /// Claims pending winnings and adds to balance
     pub fn claim_winnings(env: Env, user: Address) -> i128 {
         user.require_auth();
