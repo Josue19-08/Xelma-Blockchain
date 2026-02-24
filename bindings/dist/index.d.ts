@@ -1,107 +1,11 @@
 import { Buffer } from "buffer";
 import { AssembledTransaction, Client as ContractClient, ClientOptions as ContractClientOptions, MethodOptions, Result } from '@stellar/stellar-sdk/contract';
-import type { u32, u128, i128, Option } from '@stellar/stellar-sdk/contract';
+import type { u32, u64, u128, i128, Option } from '@stellar/stellar-sdk/contract';
 export * from '@stellar/stellar-sdk';
 export * as contract from '@stellar/stellar-sdk/contract';
 export * as rpc from '@stellar/stellar-sdk/rpc';
 /**
- * Represents a prediction round
- * This stores all the information about an active betting round
- */
-export interface Round {
-    /**
-   * The ledger number when this round ends
-   * Ledgers are like blocks in blockchain - they increment every ~5 seconds
-   */
-    end_ledger: u32;
-    /**
-   * Total vXLM in the "DOWN" pool (people betting price will go down)
-   */
-    pool_down: i128;
-    /**
-   * Total vXLM in the "UP" pool (people betting price will go up)
-   */
-    pool_up: i128;
-    /**
-   * The starting price of XLM when the round begins (in stroops)
-   */
-    price_start: u128;
-}
-/**
- * Represents which side a user bet on
- */
-export type BetSide = {
-    tag: "Up";
-    values: void;
-} | {
-    tag: "Down";
-    values: void;
-};
-/**
- * Storage keys for organizing data in the contract
- * Think of these as "labels" for different storage compartments
- *
- * The #[contracttype] attribute tells Soroban this can be stored in the contract
- */
-export type DataKey = {
-    tag: "Balance";
-    values: readonly [string];
-} | {
-    tag: "Admin";
-    values: void;
-} | {
-    tag: "Oracle";
-    values: void;
-} | {
-    tag: "ActiveRound";
-    values: void;
-} | {
-    tag: "Positions";
-    values: void;
-} | {
-    tag: "PendingWinnings";
-    values: readonly [string];
-} | {
-    tag: "UserStats";
-    values: readonly [string];
-};
-/**
- * Tracks a user's prediction performance
- */
-export interface UserStats {
-    /**
-   * Best winning streak ever achieved
-   */
-    best_streak: u32;
-    /**
-   * Current winning streak (consecutive wins)
-   */
-    current_streak: u32;
-    /**
-   * Total number of rounds lost
-   */
-    total_losses: u32;
-    /**
-   * Total number of rounds won
-   */
-    total_wins: u32;
-}
-/**
- * Stores an individual user's bet in a round
- */
-export interface UserPosition {
-    /**
-   * How much vXLM the user bet
-   */
-    amount: i128;
-    /**
-   * Which side they bet on
-   */
-    side: BetSide;
-}
-/**
- * Custom error types for the contract
- * Using explicit error codes helps with debugging and provides clear feedback
+ * Contract error types
  */
 export declare const ContractError: {
     /**
@@ -182,140 +86,120 @@ export declare const ContractError: {
     13: {
         message: string;
     };
+    /**
+     * Invalid round mode (must be 0 or 1)
+     */
+    14: {
+        message: string;
+    };
+    /**
+     * Wrong prediction type for current round mode
+     */
+    15: {
+        message: string;
+    };
+    /**
+     * Round has not reached end_ledger yet
+     */
+    16: {
+        message: string;
+    };
+    /**
+     * Invalid price scale (must represent 4 decimal places)
+     */
+    17: {
+        message: string;
+    };
 };
+/**
+ * Round mode for prediction type
+ */
+export declare enum RoundMode {
+    UpDown = 0,
+    Precision = 1
+}
+/**
+ * Storage keys for contract data
+ */
+export type DataKey = {
+    tag: "Balance";
+    values: readonly [string];
+} | {
+    tag: "Admin";
+    values: void;
+} | {
+    tag: "Oracle";
+    values: void;
+} | {
+    tag: "ActiveRound";
+    values: void;
+} | {
+    tag: "Positions";
+    values: void;
+} | {
+    tag: "UpDownPositions";
+    values: void;
+} | {
+    tag: "PrecisionPositions";
+    values: void;
+} | {
+    tag: "PendingWinnings";
+    values: readonly [string];
+} | {
+    tag: "UserStats";
+    values: readonly [string];
+} | {
+    tag: "BetWindowLedgers";
+    values: void;
+} | {
+    tag: "RunWindowLedgers";
+    values: void;
+} | {
+    tag: "LastRoundId";
+    values: void;
+};
+/**
+ * Represents which side a user bet on
+ */
+export type BetSide = {
+    tag: "Up";
+    values: void;
+} | {
+    tag: "Down";
+    values: void;
+};
+export interface UserPosition {
+    amount: i128;
+    side: BetSide;
+}
+export interface UserStats {
+    best_streak: u32;
+    current_streak: u32;
+    total_losses: u32;
+    total_wins: u32;
+}
+/**
+ * Precision prediction entry (user address + predicted price)
+ */
+export interface PrecisionPrediction {
+    amount: i128;
+    predicted_price: u128;
+    user: string;
+}
+export interface Round {
+    bet_end_ledger: u32;
+    end_ledger: u32;
+    mode: RoundMode;
+    pool_down: i128;
+    pool_up: i128;
+    price_start: u128;
+    round_id: u64;
+    start_ledger: u32;
+}
 export interface Client {
     /**
-     * Construct and simulate a balance transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
-     * Queries (reads) the current vXLM balance for a user
-     *
-     * # Parameters
-     * * `env` - The contract environment
-     * * `user` - The address of the user whose balance we want to check
-     *
-     * # Returns
-     * The user's balance as an i128 (128-bit integer)
-     * Returns 0 if the user has never received tokens
-     */
-    balance: ({ user }: {
-        user: string;
-    }, options?: {
-        /**
-         * The fee to pay for the transaction. Default: BASE_FEE
-         */
-        fee?: number;
-        /**
-         * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-         */
-        timeoutInSeconds?: number;
-        /**
-         * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-         */
-        simulate?: boolean;
-    }) => Promise<AssembledTransaction<i128>>;
-    /**
-     * Construct and simulate a get_admin transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
-     * Gets the admin address
-     *
-     * # Returns
-     * Option<Address> - Some(admin) if set, None if not initialized
-     */
-    get_admin: (options?: {
-        /**
-         * The fee to pay for the transaction. Default: BASE_FEE
-         */
-        fee?: number;
-        /**
-         * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-         */
-        timeoutInSeconds?: number;
-        /**
-         * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-         */
-        simulate?: boolean;
-    }) => Promise<AssembledTransaction<Option<string>>>;
-    /**
-     * Construct and simulate a place_bet transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
-     * Places a bet on the active round
-     *
-     * # Parameters
-     * * `env` - The contract environment
-     * * `user` - The address of the user placing the bet
-     * * `amount` - Amount of vXLM to bet (must be > 0)
-     * * `side` - Which side to bet on (Up or Down)
-     *
-     * # Security
-     * - Requires user authorization (prevents unauthorized betting)
-     * - Validates bet amount is positive
-     * - Checks round is still active (prevents late bets)
-     * - Verifies sufficient balance (prevents negative balances)
-     * - Prevents double betting in same round
-     * - Uses checked arithmetic to prevent overflow
-     * - No reentrancy risk: state updates before external calls (CEI pattern)
-     *
-     * # Errors
-     * - `ContractError::InvalidBetAmount` if amount <= 0
-     * - `ContractError::NoActiveRound` if no round exists
-     * - `ContractError::RoundEnded` if round has ended
-     * - `ContractError::InsufficientBalance` if user balance too low
-     * - `ContractError::AlreadyBet` if user already bet in this round
-     * - `ContractError::Overflow` if pool calculation overflows
-     */
-    place_bet: ({ user, amount, side }: {
-        user: string;
-        amount: i128;
-        side: BetSide;
-    }, options?: {
-        /**
-         * The fee to pay for the transaction. Default: BASE_FEE
-         */
-        fee?: number;
-        /**
-         * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-         */
-        timeoutInSeconds?: number;
-        /**
-         * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-         */
-        simulate?: boolean;
-    }) => Promise<AssembledTransaction<Result<void>>>;
-    /**
-     * Construct and simulate a get_oracle transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
-     * Gets the oracle address
-     *
-     * # Returns
-     * Option<Address> - Some(oracle) if set, None if not initialized
-     */
-    get_oracle: (options?: {
-        /**
-         * The fee to pay for the transaction. Default: BASE_FEE
-         */
-        fee?: number;
-        /**
-         * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-         */
-        timeoutInSeconds?: number;
-        /**
-         * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-         */
-        simulate?: boolean;
-    }) => Promise<AssembledTransaction<Option<string>>>;
-    /**
      * Construct and simulate a initialize transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
-     * Initializes the contract by setting the admin and oracle
-     * This should be called once when deploying the contract
-     *
-     * # Parameters
-     * * `env` - The contract environment
-     * * `admin` - The address that will have admin privileges (creates rounds)
-     * * `oracle` - The address that provides price data and resolves rounds
-     *
-     * # Security
-     * - Prevents re-initialization attacks
-     * - Requires admin authorization
-     * - Admin and oracle cannot be the same (separation of concerns)
-     *
-     * # Errors
-     * Returns `ContractError::AlreadyInitialized` if contract was already initialized
+     * Initializes the contract with admin and oracle addresses (one-time only)
      */
     initialize: ({ admin, oracle }: {
         admin: string;
@@ -336,30 +220,12 @@ export interface Client {
     }) => Promise<AssembledTransaction<Result<void>>>;
     /**
      * Construct and simulate a create_round transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
-     * Creates a new prediction round
-     * Only the admin can call this function
-     *
-     * # Parameters
-     * * `env` - The contract environment
-     * * `start_price` - The current XLM price in stroops (e.g., 1 XLM = 10,000,000 stroops)
-     * * `duration_ledgers` - How many ledgers (blocks) the round should last
-     * Example: 60 ledgers ≈ 5 minutes (since ledgers are ~5 seconds)
-     *
-     * # Security
-     * - Only admin can create rounds (prevents unauthorized round creation)
-     * - Validates price is non-zero
-     * - Validates duration is reasonable (prevents DoS)
-     * - Checks for overflow when calculating end_ledger
-     *
-     * # Errors
-     * - `ContractError::AdminNotSet` if contract not initialized
-     * - `ContractError::InvalidPrice` if start_price is 0
-     * - `ContractError::InvalidDuration` if duration is 0 or too large
-     * - `ContractError::Overflow` if end_ledger calculation overflows
+     * Creates a new prediction round (admin only)
+     * mode: 0 = Up/Down (default), 1 = Precision (Legends)
      */
-    create_round: ({ start_price, duration_ledgers }: {
+    create_round: ({ start_price, mode }: {
         start_price: u128;
-        duration_ledgers: u32;
+        mode: Option<u32>;
     }, options?: {
         /**
          * The fee to pay for the transaction. Default: BASE_FEE
@@ -375,19 +241,123 @@ export interface Client {
         simulate?: boolean;
     }) => Promise<AssembledTransaction<Result<void>>>;
     /**
-     * Construct and simulate a mint_initial transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
-     * Mints (creates) initial vXLM tokens for a user on their first interaction
-     *
-     * # Parameters
-     * * `env` - The contract environment (provided by Soroban, gives access to storage, etc.)
-     * * `user` - The address of the user who will receive tokens
-     *
-     * # How it works
-     * 1. Checks if user already has a balance
-     * 2. If not, gives them 1000 vXLM as a starting amount
-     * 3. Stores this balance in the contract's persistent storage
+     * Construct and simulate a get_active_round transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+     * Returns the currently active round, if any
      */
-    mint_initial: ({ user }: {
+    get_active_round: (options?: {
+        /**
+         * The fee to pay for the transaction. Default: BASE_FEE
+         */
+        fee?: number;
+        /**
+         * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
+         */
+        timeoutInSeconds?: number;
+        /**
+         * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
+         */
+        simulate?: boolean;
+    }) => Promise<AssembledTransaction<Option<Round>>>;
+    /**
+     * Construct and simulate a get_last_round_id transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+     * Returns the ID of the last created round (0 if no rounds created yet)
+     */
+    get_last_round_id: (options?: {
+        /**
+         * The fee to pay for the transaction. Default: BASE_FEE
+         */
+        fee?: number;
+        /**
+         * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
+         */
+        timeoutInSeconds?: number;
+        /**
+         * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
+         */
+        simulate?: boolean;
+    }) => Promise<AssembledTransaction<u64>>;
+    /**
+     * Construct and simulate a get_admin transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+     */
+    get_admin: (options?: {
+        /**
+         * The fee to pay for the transaction. Default: BASE_FEE
+         */
+        fee?: number;
+        /**
+         * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
+         */
+        timeoutInSeconds?: number;
+        /**
+         * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
+         */
+        simulate?: boolean;
+    }) => Promise<AssembledTransaction<Option<string>>>;
+    /**
+     * Construct and simulate a get_oracle transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+     */
+    get_oracle: (options?: {
+        /**
+         * The fee to pay for the transaction. Default: BASE_FEE
+         */
+        fee?: number;
+        /**
+         * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
+         */
+        timeoutInSeconds?: number;
+        /**
+         * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
+         */
+        simulate?: boolean;
+    }) => Promise<AssembledTransaction<Option<string>>>;
+    /**
+     * Construct and simulate a set_windows transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+     * Sets the betting and execution windows (admin only)
+     * bet_ledgers: Number of ledgers users can place bets
+     * run_ledgers: Total number of ledgers before round can be resolved
+     */
+    set_windows: ({ bet_ledgers, run_ledgers }: {
+        bet_ledgers: u32;
+        run_ledgers: u32;
+    }, options?: {
+        /**
+         * The fee to pay for the transaction. Default: BASE_FEE
+         */
+        fee?: number;
+        /**
+         * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
+         */
+        timeoutInSeconds?: number;
+        /**
+         * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
+         */
+        simulate?: boolean;
+    }) => Promise<AssembledTransaction<Result<void>>>;
+    /**
+     * Construct and simulate a get_user_stats transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+     * Returns user statistics (wins, losses, streaks)
+     */
+    get_user_stats: ({ user }: {
+        user: string;
+    }, options?: {
+        /**
+         * The fee to pay for the transaction. Default: BASE_FEE
+         */
+        fee?: number;
+        /**
+         * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
+         */
+        timeoutInSeconds?: number;
+        /**
+         * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
+         */
+        simulate?: boolean;
+    }) => Promise<AssembledTransaction<UserStats>>;
+    /**
+     * Construct and simulate a get_pending_winnings transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+     * Returns user's claimable winnings
+     */
+    get_pending_winnings: ({ user }: {
         user: string;
     }, options?: {
         /**
@@ -404,30 +374,154 @@ export interface Client {
         simulate?: boolean;
     }) => Promise<AssembledTransaction<i128>>;
     /**
+     * Construct and simulate a place_bet transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+     * Places a bet on the active round (Up/Down mode only)
+     */
+    place_bet: ({ user, amount, side }: {
+        user: string;
+        amount: i128;
+        side: BetSide;
+    }, options?: {
+        /**
+         * The fee to pay for the transaction. Default: BASE_FEE
+         */
+        fee?: number;
+        /**
+         * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
+         */
+        timeoutInSeconds?: number;
+        /**
+         * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
+         */
+        simulate?: boolean;
+    }) => Promise<AssembledTransaction<Result<void>>>;
+    /**
+     * Construct and simulate a place_precision_prediction transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+     * Places a precision prediction on the active round (Precision/Legends mode only)
+     * predicted_price: price scaled to 4 decimals (e.g., 0.2297 → 2297)
+     */
+    place_precision_prediction: ({ user, amount, predicted_price }: {
+        user: string;
+        amount: i128;
+        predicted_price: u128;
+    }, options?: {
+        /**
+         * The fee to pay for the transaction. Default: BASE_FEE
+         */
+        fee?: number;
+        /**
+         * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
+         */
+        timeoutInSeconds?: number;
+        /**
+         * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
+         */
+        simulate?: boolean;
+    }) => Promise<AssembledTransaction<Result<void>>>;
+    /**
+     * Construct and simulate a predict_price transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+     * Alias for place_precision_prediction - allows users to submit exact price predictions
+     * guessed_price: price scaled to 4 decimals (e.g., 0.2297 → 2297)
+     */
+    predict_price: ({ user, guessed_price, amount }: {
+        user: string;
+        guessed_price: u128;
+        amount: i128;
+    }, options?: {
+        /**
+         * The fee to pay for the transaction. Default: BASE_FEE
+         */
+        fee?: number;
+        /**
+         * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
+         */
+        timeoutInSeconds?: number;
+        /**
+         * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
+         */
+        simulate?: boolean;
+    }) => Promise<AssembledTransaction<Result<void>>>;
+    /**
+     * Construct and simulate a get_user_position transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+     * Returns user's position in the current round (Up/Down mode)
+     */
+    get_user_position: ({ user }: {
+        user: string;
+    }, options?: {
+        /**
+         * The fee to pay for the transaction. Default: BASE_FEE
+         */
+        fee?: number;
+        /**
+         * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
+         */
+        timeoutInSeconds?: number;
+        /**
+         * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
+         */
+        simulate?: boolean;
+    }) => Promise<AssembledTransaction<Option<UserPosition>>>;
+    /**
+     * Construct and simulate a get_user_precision_prediction transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+     * Returns user's precision prediction in the current round (Precision mode)
+     */
+    get_user_precision_prediction: ({ user }: {
+        user: string;
+    }, options?: {
+        /**
+         * The fee to pay for the transaction. Default: BASE_FEE
+         */
+        fee?: number;
+        /**
+         * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
+         */
+        timeoutInSeconds?: number;
+        /**
+         * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
+         */
+        simulate?: boolean;
+    }) => Promise<AssembledTransaction<Option<PrecisionPrediction>>>;
+    /**
+     * Construct and simulate a get_precision_predictions transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+     * Returns all precision predictions for the current round
+     */
+    get_precision_predictions: (options?: {
+        /**
+         * The fee to pay for the transaction. Default: BASE_FEE
+         */
+        fee?: number;
+        /**
+         * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
+         */
+        timeoutInSeconds?: number;
+        /**
+         * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
+         */
+        simulate?: boolean;
+    }) => Promise<AssembledTransaction<Array<PrecisionPrediction>>>;
+    /**
+     * Construct and simulate a get_updown_positions transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+     * Returns all Up/Down positions for the current round
+     */
+    get_updown_positions: (options?: {
+        /**
+         * The fee to pay for the transaction. Default: BASE_FEE
+         */
+        fee?: number;
+        /**
+         * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
+         */
+        timeoutInSeconds?: number;
+        /**
+         * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
+         */
+        simulate?: boolean;
+    }) => Promise<AssembledTransaction<Map<string, UserPosition>>>;
+    /**
      * Construct and simulate a resolve_round transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
-     * Resolves a round with the final price and calculates winnings
-     * Only the oracle can call this function
-     *
-     * # Parameters
-     * * `env` - The contract environment
-     * * `final_price` - The XLM price at round end (in stroops)
-     *
-     * # Security
-     * - Only oracle can resolve (prevents unauthorized resolution)
-     * - Validates final price is non-zero
-     * - Uses checked arithmetic in payout calculations
-     * - No reentrancy: state cleared after all calculations
-     * - Proportional distribution prevents manipulation
-     *
-     * # Errors
-     * - `ContractError::OracleNotSet` if oracle not configured
-     * - `ContractError::NoActiveRound` if no round to resolve
-     * - `ContractError::InvalidPrice` if final_price is 0
-     *
-     * # Payout logic
-     * - If price went UP: UP bettors split the DOWN pool proportionally
-     * - If price went DOWN: DOWN bettors split the UP pool proportionally
-     * - If price UNCHANGED: Everyone gets their bet back (no winners/losers)
+     * Resolves the round with final price (oracle only)
+     * Mode 0 (Up/Down): Winners split losers' pool proportionally; ties get refunds
+     * Mode 1 (Precision/Legends): Closest guess wins full pot; ties split evenly
      */
     resolve_round: ({ final_price }: {
         final_price: u128;
@@ -447,19 +541,7 @@ export interface Client {
     }) => Promise<AssembledTransaction<Result<void>>>;
     /**
      * Construct and simulate a claim_winnings transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
-     * Claims pending winnings for a user
-     *
-     * # Parameters
-     * * `env` - The contract environment
-     * * `user` - The address claiming winnings
-     *
-     * # How it works
-     * 1. Check if user has pending winnings
-     * 2. Add winnings to user's balance
-     * 3. Clear pending winnings
-     *
-     * # Returns
-     * Amount claimed (0 if no pending winnings)
+     * Claims pending winnings and adds to balance
      */
     claim_winnings: ({ user }: {
         user: string;
@@ -478,17 +560,10 @@ export interface Client {
         simulate?: boolean;
     }) => Promise<AssembledTransaction<i128>>;
     /**
-     * Construct and simulate a get_user_stats transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
-     * Gets a user's statistics (wins, losses, streaks)
-     *
-     * # Parameters
-     * * `env` - The contract environment
-     * * `user` - The address of the user
-     *
-     * # Returns
-     * UserStats if the user has participated, or default stats (all zeros)
+     * Construct and simulate a mint_initial transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+     * Mints 1000 vXLM for new users (one-time only)
      */
-    get_user_stats: ({ user }: {
+    mint_initial: ({ user }: {
         user: string;
     }, options?: {
         /**
@@ -503,70 +578,12 @@ export interface Client {
          * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
          */
         simulate?: boolean;
-    }) => Promise<AssembledTransaction<UserStats>>;
+    }) => Promise<AssembledTransaction<i128>>;
     /**
-     * Construct and simulate a get_active_round transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
-     * Gets the currently active round
-     *
-     * # Returns
-     * Option<Round> - Some(round) if there's an active round, None if not
-     *
-     * # Use case
-     * Frontend can call this to display current round info to users
+     * Construct and simulate a balance transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+     * Returns user's vXLM balance
      */
-    get_active_round: (options?: {
-        /**
-         * The fee to pay for the transaction. Default: BASE_FEE
-         */
-        fee?: number;
-        /**
-         * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-         */
-        timeoutInSeconds?: number;
-        /**
-         * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-         */
-        simulate?: boolean;
-    }) => Promise<AssembledTransaction<Option<Round>>>;
-    /**
-     * Construct and simulate a get_user_position transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
-     * Gets a user's position in the current round
-     *
-     * # Parameters
-     * * `env` - The contract environment
-     * * `user` - The address of the user
-     *
-     * # Returns
-     * Option<UserPosition> - Some(position) if user has bet, None if not
-     */
-    get_user_position: ({ user }: {
-        user: string;
-    }, options?: {
-        /**
-         * The fee to pay for the transaction. Default: BASE_FEE
-         */
-        fee?: number;
-        /**
-         * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-         */
-        timeoutInSeconds?: number;
-        /**
-         * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-         */
-        simulate?: boolean;
-    }) => Promise<AssembledTransaction<Option<UserPosition>>>;
-    /**
-     * Construct and simulate a get_pending_winnings transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
-     * Gets a user's pending winnings (amount they can claim)
-     *
-     * # Parameters
-     * * `env` - The contract environment
-     * * `user` - The address of the user
-     *
-     * # Returns
-     * Amount of vXLM the user can claim (0 if none)
-     */
-    get_pending_winnings: ({ user }: {
+    balance: ({ user }: {
         user: string;
     }, options?: {
         /**
@@ -597,18 +614,25 @@ export declare class Client extends ContractClient {
     }): Promise<AssembledTransaction<T>>;
     constructor(options: ContractClientOptions);
     readonly fromJSON: {
-        balance: (json: string) => AssembledTransaction<bigint>;
-        get_admin: (json: string) => AssembledTransaction<Option<string>>;
-        place_bet: (json: string) => AssembledTransaction<Result<void, import("@stellar/stellar-sdk/contract").ErrorMessage>>;
-        get_oracle: (json: string) => AssembledTransaction<Option<string>>;
         initialize: (json: string) => AssembledTransaction<Result<void, import("@stellar/stellar-sdk/contract").ErrorMessage>>;
         create_round: (json: string) => AssembledTransaction<Result<void, import("@stellar/stellar-sdk/contract").ErrorMessage>>;
-        mint_initial: (json: string) => AssembledTransaction<bigint>;
+        get_active_round: (json: string) => AssembledTransaction<Option<Round>>;
+        get_last_round_id: (json: string) => AssembledTransaction<bigint>;
+        get_admin: (json: string) => AssembledTransaction<Option<string>>;
+        get_oracle: (json: string) => AssembledTransaction<Option<string>>;
+        set_windows: (json: string) => AssembledTransaction<Result<void, import("@stellar/stellar-sdk/contract").ErrorMessage>>;
+        get_user_stats: (json: string) => AssembledTransaction<UserStats>;
+        get_pending_winnings: (json: string) => AssembledTransaction<bigint>;
+        place_bet: (json: string) => AssembledTransaction<Result<void, import("@stellar/stellar-sdk/contract").ErrorMessage>>;
+        place_precision_prediction: (json: string) => AssembledTransaction<Result<void, import("@stellar/stellar-sdk/contract").ErrorMessage>>;
+        predict_price: (json: string) => AssembledTransaction<Result<void, import("@stellar/stellar-sdk/contract").ErrorMessage>>;
+        get_user_position: (json: string) => AssembledTransaction<Option<UserPosition>>;
+        get_user_precision_prediction: (json: string) => AssembledTransaction<Option<PrecisionPrediction>>;
+        get_precision_predictions: (json: string) => AssembledTransaction<PrecisionPrediction[]>;
+        get_updown_positions: (json: string) => AssembledTransaction<Map<string, UserPosition>>;
         resolve_round: (json: string) => AssembledTransaction<Result<void, import("@stellar/stellar-sdk/contract").ErrorMessage>>;
         claim_winnings: (json: string) => AssembledTransaction<bigint>;
-        get_user_stats: (json: string) => AssembledTransaction<UserStats>;
-        get_active_round: (json: string) => AssembledTransaction<Option<Round>>;
-        get_user_position: (json: string) => AssembledTransaction<Option<UserPosition>>;
-        get_pending_winnings: (json: string) => AssembledTransaction<bigint>;
+        mint_initial: (json: string) => AssembledTransaction<bigint>;
+        balance: (json: string) => AssembledTransaction<bigint>;
     };
 }
