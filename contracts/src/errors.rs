@@ -42,4 +42,3 @@ pub enum ContractError {
     /// Invalid price scale (must represent 4 decimal places)
     InvalidPriceScale = 17,
 }
-
