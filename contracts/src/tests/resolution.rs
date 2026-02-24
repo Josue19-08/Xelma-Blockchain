@@ -598,11 +598,13 @@ fn test_resolve_precision_three_way_tie() {
     // Actual price 2200 - Alice diff 10, Bob diff 10, Charlie diff 10
     client.resolve_round(&2200);
 
-    // Total pot is 400, split 3 ways = 133 each (integer division)
-    let pot_per_winner = 400_0000000 / 3;
-    assert_eq!(client.get_pending_winnings(&alice), pot_per_winner);
-    assert_eq!(client.get_pending_winnings(&bob), pot_per_winner);
-    assert_eq!(client.get_pending_winnings(&charlie), pot_per_winner);
+    // Total pot is 400, split 3 ways = 133.33... each
+    // With remainder policy: Alice gets 133 + 1 (remainder), Bob and Charlie get 133
+    let pot_per_winner = 400_0000000 / 3;  // 133_3333333
+    let remainder = 400_0000000 % 3;        // 1
+    assert_eq!(client.get_pending_winnings(&alice), pot_per_winner + remainder);  // 133_3333334
+    assert_eq!(client.get_pending_winnings(&bob), pot_per_winner);                // 133_3333333
+    assert_eq!(client.get_pending_winnings(&charlie), pot_per_winner);            // 133_3333333
 }
 
 #[test]
@@ -692,5 +694,215 @@ fn test_resolve_precision_large_differences() {
 
     assert_eq!(client.get_pending_winnings(&alice), 200_0000000);
     assert_eq!(client.get_pending_winnings(&bob), 0);
+}
+
+#[test]
+fn test_precision_remainder_3way_tie_uneven_pot() {
+    let env = Env::default();
+    let contract_id = env.register(VirtualTokenContract, ());
+    let client = VirtualTokenContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let oracle = Address::generate(&env);
+    env.mock_all_auths();
+
+    client.initialize(&admin, &oracle);
+
+    client.create_round(&1_0000, &Some(1));
+
+    let alice = Address::generate(&env);
+    let bob = Address::generate(&env);
+    let charlie = Address::generate(&env);
+
+    client.mint_initial(&alice);
+    client.mint_initial(&bob);
+    client.mint_initial(&charlie);
+
+    // Total pot: 100 vXLM, 3 winners = 33.33... each
+    // Expected: Alice 34 (33 + 1 remainder), Bob 33, Charlie 33
+    env.as_contract(&contract_id, || {
+        let mut predictions = Vec::<PrecisionPrediction>::new(&env);
+
+        predictions.push_back(PrecisionPrediction {
+            user: alice.clone(),
+            predicted_price: 2_0000,
+            amount: 30_0000000,
+        });
+
+        predictions.push_back(PrecisionPrediction {
+            user: bob.clone(),
+            predicted_price: 2_0000,
+            amount: 30_0000000,
+        });
+
+        predictions.push_back(PrecisionPrediction {
+            user: charlie.clone(),
+            predicted_price: 2_0000,
+            amount: 40_0000000,
+        });
+
+        env.storage().persistent().set(&DataKey::PrecisionPositions, &predictions);
+    });
+
+    env.ledger().with_mut(|li| {
+        li.sequence_number = 12;
+    });
+
+    // All tied with perfect guess
+    client.resolve_round(&2_0000);
+
+    // Total pot: 100_0000000, Winner count: 3
+    // payout_per_winner = 100_0000000 / 3 = 33_3333333
+    // remainder = 100_0000000 % 3 = 1
+    // Alice (first winner): 33_3333333 + 1 = 33_3333334
+    // Bob: 33_3333333
+    // Charlie: 33_3333333
+    let pot_per_winner = 100_0000000 / 3;
+    let remainder = 100_0000000 % 3;
+    assert_eq!(client.get_pending_winnings(&alice), pot_per_winner + remainder);  // 33_3333334
+    assert_eq!(client.get_pending_winnings(&bob), pot_per_winner);                // 33_3333333
+    assert_eq!(client.get_pending_winnings(&charlie), pot_per_winner);            // 33_3333333
+
+    // Verify full pot accounting: 33_3333334 + 33_3333333 + 33_3333333 = 100_0000000 ✓
+}
+
+#[test]
+fn test_precision_remainder_5way_tie() {
+    let env = Env::default();
+    let contract_id = env.register(VirtualTokenContract, ());
+    let client = VirtualTokenContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let oracle = Address::generate(&env);
+    env.mock_all_auths();
+
+    client.initialize(&admin, &oracle);
+
+    client.create_round(&1_0000, &Some(1));
+
+    let user1 = Address::generate(&env);
+    let user2 = Address::generate(&env);
+    let user3 = Address::generate(&env);
+    let user4 = Address::generate(&env);
+    let user5 = Address::generate(&env);
+
+    client.mint_initial(&user1);
+    client.mint_initial(&user2);
+    client.mint_initial(&user3);
+    client.mint_initial(&user4);
+    client.mint_initial(&user5);
+
+    // Total pot: 103 vXLM, 5 winners = 20.6 each
+    // Expected: user1 23 (20 + 3 remainder), others 20 each
+    env.as_contract(&contract_id, || {
+        let mut predictions = Vec::<PrecisionPrediction>::new(&env);
+
+        predictions.push_back(PrecisionPrediction {
+            user: user1.clone(),
+            predicted_price: 5_0000,
+            amount: 23_0000000,
+        });
+
+        predictions.push_back(PrecisionPrediction {
+            user: user2.clone(),
+            predicted_price: 5_0000,
+            amount: 20_0000000,
+        });
+
+        predictions.push_back(PrecisionPrediction {
+            user: user3.clone(),
+            predicted_price: 5_0000,
+            amount: 20_0000000,
+        });
+
+        predictions.push_back(PrecisionPrediction {
+            user: user4.clone(),
+            predicted_price: 5_0000,
+            amount: 20_0000000,
+        });
+
+        predictions.push_back(PrecisionPrediction {
+            user: user5.clone(),
+            predicted_price: 5_0000,
+            amount: 20_0000000,
+        });
+
+        env.storage().persistent().set(&DataKey::PrecisionPositions, &predictions);
+    });
+
+    env.ledger().with_mut(|li| {
+        li.sequence_number = 12;
+    });
+
+    // All tied
+    client.resolve_round(&5_0000);
+
+    // Total pot: 103_0000000, Winner count: 5
+    // payout_per_winner = 103_0000000 / 5 = 20_6000000
+    // remainder = 103_0000000 % 5 = 3_0000000
+    // user1 (first winner): 20_6000000 + 3_0000000 = 23_6000000
+    // Others: 20_6000000 each
+    let pot_per_winner = 103_0000000 / 5;
+    let remainder = 103_0000000 % 5;
+    assert_eq!(client.get_pending_winnings(&user1), pot_per_winner + remainder);  // 23_6000000
+    assert_eq!(client.get_pending_winnings(&user2), pot_per_winner);              // 20_6000000
+    assert_eq!(client.get_pending_winnings(&user3), pot_per_winner);              // 20_6000000
+    assert_eq!(client.get_pending_winnings(&user4), pot_per_winner);              // 20_6000000
+    assert_eq!(client.get_pending_winnings(&user5), pot_per_winner);              // 20_6000000
+
+    // Verify full pot accounting: 23_6000000 + 20_6000000*4 = 103_0000000 ✓
+}
+
+#[test]
+fn test_precision_no_remainder() {
+    let env = Env::default();
+    let contract_id = env.register(VirtualTokenContract, ());
+    let client = VirtualTokenContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let oracle = Address::generate(&env);
+    env.mock_all_auths();
+
+    client.initialize(&admin, &oracle);
+
+    client.create_round(&1_0000, &Some(1));
+
+    let alice = Address::generate(&env);
+    let bob = Address::generate(&env);
+
+    client.mint_initial(&alice);
+    client.mint_initial(&bob);
+
+    // Total pot: 100 vXLM, 2 winners = 50 each (perfect division)
+    env.as_contract(&contract_id, || {
+        let mut predictions = Vec::<PrecisionPrediction>::new(&env);
+
+        predictions.push_back(PrecisionPrediction {
+            user: alice.clone(),
+            predicted_price: 3_0000,
+            amount: 50_0000000,
+        });
+
+        predictions.push_back(PrecisionPrediction {
+            user: bob.clone(),
+            predicted_price: 3_0000,
+            amount: 50_0000000,
+        });
+
+        env.storage().persistent().set(&DataKey::PrecisionPositions, &predictions);
+    });
+
+    env.ledger().with_mut(|li| {
+        li.sequence_number = 12;
+    });
+
+    client.resolve_round(&3_0000);
+
+    // Total pot: 100, Winner count: 2
+    // payout_per_winner = 100 / 2 = 50
+    // remainder = 100 % 2 = 0
+    // Both get exactly 50
+    assert_eq!(client.get_pending_winnings(&alice), 50_0000000);
+    assert_eq!(client.get_pending_winnings(&bob), 50_0000000);
 }
 
