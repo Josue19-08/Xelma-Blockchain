@@ -9,6 +9,7 @@ Xelma is a **decentralized prediction market** built on the Stellar blockchain (
 ## 🔥 Problem We're Solving
 
 ### Traditional Prediction Markets Are:
+
 - ❌ **Centralized** - Single point of failure, can be shut down
 - ❌ **Opaque** - Users can't verify fair payouts or manipulation
 - ❌ **High barriers** - Require KYC, bank accounts, or specific payment methods
@@ -16,6 +17,7 @@ Xelma is a **decentralized prediction market** built on the Stellar blockchain (
 - ❌ **Trust-based** - You must trust the operator won't steal funds
 
 ### Xelma Solves This With:
+
 - ✅ **Decentralized** - Runs on Stellar blockchain, unstoppable
 - ✅ **Transparent** - All bets, rounds, and payouts are on-chain and verifiable
 - ✅ **Permissionless** - Anyone with a Stellar wallet can participate
@@ -67,11 +69,13 @@ Xelma is a **decentralized prediction market** built on the Stellar blockchain (
 ## 💡 Key Features
 
 ### Virtual Token System
+
 - **1000 vXLM** initial balance per user
 - No real money required to start
 - Balance tracked on-chain
 
 ### Fair Proportional Payouts
+
 ```
 Winner's Payout = Their Bet + (Their Bet / Winning Pool) × Losing Pool
 
@@ -84,6 +88,7 @@ Example:
 ```
 
 ### Security Features
+
 - ✅ **Role-based access** - Admin, Oracle, User permissions
 - ✅ **Overflow protection** - Checked arithmetic prevents exploits
 - ✅ **Input validation** - All parameters validated before execution
@@ -91,6 +96,7 @@ Example:
 - ✅ **Claim-based withdrawal** - Users control when to claim winnings
 
 ### User Statistics
+
 - Total wins / losses
 - Current winning streak
 - Best streak ever achieved
@@ -101,7 +107,9 @@ Example:
 
 \`\`\`bash
 npm install @tevalabs/xelma-bindings
+
 # or
+
 yarn add @tevalabs/xelma-bindings
 \`\`\`
 
@@ -112,9 +120,9 @@ import { Client, BetSide } from '@tevalabs/xelma-bindings';
 
 // Initialize client
 const client = new Client({
-  contractId: 'YOUR_CONTRACT_ID',
-  networkPassphrase: Networks.TESTNET,
-  rpcUrl: 'https://soroban-testnet.stellar.org'
+contractId: 'YOUR_CONTRACT_ID',
+networkPassphrase: Networks.TESTNET,
+rpcUrl: 'https://soroban-testnet.stellar.org'
 });
 
 // Mint initial tokens
@@ -127,16 +135,16 @@ console.log('Balance:', balance); // 10000000000 (1000 vXLM in stroops)
 // Get active round
 const round = await client.get_active_round();
 if (round) {
-  console.log('Start price:', round.price_start);
-  console.log('UP pool:', round.pool_up);
-  console.log('DOWN pool:', round.pool_down);
+console.log('Start price:', round.price_start);
+console.log('UP pool:', round.pool_up);
+console.log('DOWN pool:', round.pool_down);
 }
 
 // Place a bet
 await client.place_bet({
-  user: userAddress,
-  amount: 100_0000000n, // 100 vXLM
-  side: BetSide.Up
+user: userAddress,
+amount: 100_0000000n, // 100 vXLM
+side: BetSide.Up
 });
 
 // Check stats
@@ -155,7 +163,9 @@ console.log('Claimed:', claimed);
 
 \`\`\`bash
 npm install
+
 # or
+
 yarn install
 \`\`\`
 
@@ -163,22 +173,54 @@ yarn install
 
 \`\`\`bash
 npm run build
+
 # or
+
 yarn build
 \`\`\`
+
+### Running Tests
+
+The bindings include integration tests that verify runtime behavior against Soroban RPC.
+
+**Run all tests:**
+
+\`\`\`bash
+npm test
+
+# or
+
+yarn test
+\`\`\`
+
+**Run tests in watch mode:**
+
+\`\`\`bash
+npm run test:watch
+\`\`\`
+
+**Run with a deployed contract:**
+
+To run full end-to-end tests against a deployed contract, set the `CONTRACT_ID` environment variable:
+
+\`\`\`bash
+CONTRACT_ID=CXXXXX... npm test
+\`\`\`
+
+Without `CONTRACT_ID`, only unit tests and account setup tests will run. The contract-dependent tests will be skipped.
 
 ### Type Definitions
 
 All types are exported and fully documented:
 
 \`\`\`typescript
-import { 
-  Client,          // Main contract client
-  BetSide,         // Enum: Up | Down
-  Round,           // Active round interface
-  UserStats,       // User performance stats
-  UserPosition,    // User's bet in a round
-  ContractError    // Error codes (1-13)
+import {
+Client, // Main contract client
+BetSide, // Enum: Up | Down
+Round, // Active round interface
+UserStats, // User performance stats
+UserPosition, // User's bet in a round
+ContractError // Error codes (1-13)
 } from '@tevalabs/xelma-bindings';
 \`\`\`
 
@@ -191,16 +233,19 @@ import {
 ## 🌟 Use Cases
 
 ### Entertainment
+
 - Predict XLM price movements in short rounds (5-15 minutes)
 - Compete with friends on leaderboards
 - Track winning streaks
 
 ### Education
+
 - Learn about prediction markets without financial risk
 - Understand blockchain interactions
 - Practice trading psychology
 
 ### Future Extensions
+
 - Real money markets (with proper licensing)
 - Multiple asset predictions (BTC, ETH, stocks)
 - Longer-term rounds (hours, days)
@@ -224,6 +269,7 @@ MIT License - See LICENSE file for details
 ## 🤝 Contributing
 
 We welcome contributions! Please check the main repository for:
+
 - Open issues labeled \`good-first-issue\`
 - Contribution guidelines
 - Code of conduct
