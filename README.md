@@ -135,6 +135,26 @@ Unlike traditional prediction markets, Xelma is:
 - ✅ Claim-based withdrawal pattern
 - ✅ Proportional payout algorithm
 - ✅ User statistics tracking
+- ✅ Precision remainder policy (first-winner receives dust)
+
+### Precision Mode Payout Policy
+
+When multiple users tie in **Precision Mode**, the total pot is split evenly using integer division. Any remainder (dust) from the division is awarded to the **first winner** (by prediction order).
+
+**Example:**
+- Total pot: 100 vXLM
+- 3-way tie (Alice, Bob, Charlie)
+- Division: 100 ÷ 3 = 33.33...
+- Payouts:
+  - Alice: 33 + 1 (remainder) = **34 vXLM**
+  - Bob: **33 vXLM**
+  - Charlie: **33 vXLM**
+- **Total distributed: 100 vXLM** ✅ (no dust lost)
+
+This ensures:
+- ✅ **Zero dust loss** - Every stroops is accounted for
+- ✅ **Simple & predictable** - First predictor gets the remainder
+- ✅ **Fair distribution** - Close to equal split, minimal advantage
 
 ### TypeScript Bindings
 - **Language**: TypeScript 5.6.2
