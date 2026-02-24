@@ -512,13 +512,25 @@ impl VirtualTokenContract {
         if !winners.is_empty() && total_pot > 0 {
             let winner_count = winners.len() as i128;
             let payout_per_winner = total_pot / winner_count;
+            let remainder = total_pot % winner_count;
 
+            // Award to each winner
             for i in 0..winners.len() {
                 if let Some(winner) = winners.get(i) {
                     let key = DataKey::PendingWinnings(winner.user.clone());
                     let existing_pending: i128 = env.storage().persistent().get(&key).unwrap_or(0);
+
+                    // First winner gets the remainder (if any)
+                    let payout = if i == 0 {
+                        payout_per_winner
+                            .checked_add(remainder)
+                            .ok_or(ContractError::Overflow)?
+                    } else {
+                        payout_per_winner
+                    };
+
                     let new_pending = existing_pending
-                        .checked_add(payout_per_winner)
+                        .checked_add(payout)
                         .ok_or(ContractError::Overflow)?;
                     env.storage().persistent().set(&key, &new_pending);
 
