@@ -41,5 +41,7 @@ pub enum ContractError {
     RoundNotEnded = 16,
     /// Invalid price scale (must represent 4 decimal places)
     InvalidPriceScale = 17,
+    /// An active round already exists and cannot be overwritten
+    RoundAlreadyActive = 18,
 }
 

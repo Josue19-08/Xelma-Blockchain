@@ -428,20 +428,23 @@ fn test_predict_price_valid_scales() {
     for price in test_cases.iter() {
         let user = Address::generate(&env);
         client.mint_initial(&user);
-        
-        // Create new round for each test
+
+        // If a previous round is still active, resolve it before creating a new one
+        if let Some(round) = client.get_active_round() {
+            env.ledger().with_mut(|li| {
+                li.sequence_number = round.end_ledger;
+            });
+            client.resolve_round(&round.price_start);
+        }
+
+        // Create new Precision round for each test case
         client.create_round(&1_0000000, &Some(1));
-        
+
         // Should succeed with valid price scale
         client.predict_price(&user, price, &100_0000000);
-        
+
         let prediction = client.get_user_precision_prediction(&user).unwrap();
         assert_eq!(prediction.predicted_price, *price);
-        
-        // Clean up for next iteration
-        env.ledger().with_mut(|li| {
-            li.sequence_number += 20;
-        });
     }
 }
 
