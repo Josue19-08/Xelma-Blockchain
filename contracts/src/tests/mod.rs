@@ -7,4 +7,5 @@ mod lifecycle;
 mod edge_cases;
 mod mode_tests;
 mod windows;
+mod round_id_tests;
 

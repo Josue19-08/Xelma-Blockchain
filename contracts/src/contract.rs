@@ -66,6 +66,16 @@ impl VirtualTokenContract {
             .get(&DataKey::RunWindowLedgers)
             .unwrap_or(12);
 
+        // Generate unique round ID
+        let last_round_id: u64 = env.storage()
+            .persistent()
+            .get(&DataKey::LastRoundId)
+            .unwrap_or(0);
+        let round_id = last_round_id
+            .checked_add(1)
+            .ok_or(ContractError::Overflow)?;
+        env.storage().persistent().set(&DataKey::LastRoundId, &round_id);
+
         let start_ledger = env.ledger().sequence();
         let bet_end_ledger = start_ledger
             .checked_add(bet_ledgers)
@@ -75,6 +85,7 @@ impl VirtualTokenContract {
             .ok_or(ContractError::Overflow)?;
 
         let round = Round {
+            round_id,
             price_start: start_price,
             start_ledger,
             bet_end_ledger,
@@ -90,11 +101,11 @@ impl VirtualTokenContract {
         env.storage().persistent().remove(&DataKey::UpDownPositions);
         env.storage().persistent().remove(&DataKey::PrecisionPositions);
 
-        // Emit round creation event with mode
+        // Emit round creation event with round ID and mode
         #[allow(deprecated)]
         env.events().publish(
             (symbol_short!("round"), symbol_short!("created")),
-            (start_price, bet_end_ledger, end_ledger, mode_value),
+            (round_id, start_price, bet_end_ledger, end_ledger, mode_value),
         );
 
         Ok(())
@@ -104,11 +115,19 @@ impl VirtualTokenContract {
     pub fn get_active_round(env: Env) -> Option<Round> {
         env.storage().persistent().get(&DataKey::ActiveRound)
     }
-    
+
+    /// Returns the ID of the last created round (0 if no rounds created yet)
+    pub fn get_last_round_id(env: Env) -> u64 {
+        env.storage()
+            .persistent()
+            .get(&DataKey::LastRoundId)
+            .unwrap_or(0)
+    }
+
     pub fn get_admin(env: Env) -> Option<Address> {
         env.storage().persistent().get(&DataKey::Admin)
     }
-    
+
     pub fn get_oracle(env: Env) -> Option<Address> {
         env.storage().persistent().get(&DataKey::Oracle)
     }
@@ -400,6 +419,9 @@ impl VirtualTokenContract {
             return Err(ContractError::RoundNotEnded);
         }
 
+        // Store round ID before cleaning up
+        let round_id = round.round_id;
+
         // Branch based on round mode
         match round.mode {
             RoundMode::UpDown => {
@@ -416,10 +438,10 @@ impl VirtualTokenContract {
         env.storage().persistent().remove(&DataKey::UpDownPositions);
         env.storage().persistent().remove(&DataKey::PrecisionPositions);
 
-        // Emit resolution event
+        // Emit resolution event with round ID
         env.events().publish(
             (symbol_short!("round"), symbol_short!("resolved")),
-            final_price,
+            (round_id, final_price),
         );
 
         Ok(())

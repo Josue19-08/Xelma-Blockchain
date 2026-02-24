@@ -26,6 +26,7 @@ pub enum DataKey {
     UserStats(Address),
     BetWindowLedgers,     // Bet window duration in ledgers
     RunWindowLedgers,     // Run window duration in ledgers
+    LastRoundId,          // Counter for monotonically increasing round IDs
 }
 
 /// Represents which side a user bet on
@@ -64,6 +65,7 @@ pub struct PrecisionPrediction {
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
 pub struct Round {
+    pub round_id: u64,       // Unique monotonically increasing round identifier
     pub price_start: u128,   // Starting XLM price in stroops
     pub start_ledger: u32,   // Ledger when round was created
     pub bet_end_ledger: u32, // Ledger when betting closes
