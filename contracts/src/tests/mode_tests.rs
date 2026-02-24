@@ -239,17 +239,24 @@ fn test_get_precision_predictions() {
     let predictions = client.get_precision_predictions();
     assert_eq!(predictions.len(), 2);
 
-    // Verify first prediction (alice)
-    let pred0 = predictions.get(0).unwrap();
-    assert_eq!(pred0.user, alice);
-    assert_eq!(pred0.amount, 100_0000000);
-    assert_eq!(pred0.predicted_price, 2297);
+    // Verify both predictions exist regardless of order
+    let mut found_alice = false;
+    let mut found_bob = false;
 
-    // Verify second prediction (bob)
-    let pred1 = predictions.get(1).unwrap();
-    assert_eq!(pred1.user, bob);
-    assert_eq!(pred1.amount, 150_0000000);
-    assert_eq!(pred1.predicted_price, 2500);
+    for pred in predictions.iter() {
+        if pred.user == alice {
+            assert_eq!(pred.amount, 100_0000000);
+            assert_eq!(pred.predicted_price, 2297);
+            found_alice = true;
+        } else if pred.user == bob {
+            assert_eq!(pred.amount, 150_0000000);
+            assert_eq!(pred.predicted_price, 2500);
+            found_bob = true;
+        }
+    }
+
+    assert!(found_alice, "Alice's prediction not found");
+    assert!(found_bob, "Bob's prediction not found");
 }
 
 #[test]

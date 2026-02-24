@@ -281,17 +281,13 @@ impl VirtualTokenContract {
         }
 
         // Check if user already has a prediction in this round
-        let mut predictions: Vec<PrecisionPrediction> = env.storage()
+        let mut predictions: Map<Address, PrecisionPrediction> = env.storage()
             .persistent()
             .get(&DataKey::PrecisionPositions)
-            .unwrap_or(Vec::new(&env));
+            .unwrap_or(Map::new(&env));
 
-        for i in 0..predictions.len() {
-            if let Some(pred) = predictions.get(i) {
-                if pred.user == user {
-                    return Err(ContractError::AlreadyBet);
-                }
-            }
+        if predictions.contains_key(user.clone()) {
+            return Err(ContractError::AlreadyBet);
         }
 
         // Deduct balance
@@ -306,7 +302,7 @@ impl VirtualTokenContract {
             predicted_price,
             amount,
         };
-        predictions.push_back(prediction);
+        predictions.set(user.clone(), prediction);
 
         env.storage().persistent().set(&DataKey::PrecisionPositions, &predictions);
 
@@ -343,27 +339,21 @@ impl VirtualTokenContract {
 
     /// Returns user's precision prediction in the current round (Precision mode)
     pub fn get_user_precision_prediction(env: Env, user: Address) -> Option<PrecisionPrediction> {
-        let predictions: Vec<PrecisionPrediction> = env.storage()
+        let predictions: Map<Address, PrecisionPrediction> = env.storage()
             .persistent()
             .get(&DataKey::PrecisionPositions)
-            .unwrap_or(Vec::new(&env));
+            .unwrap_or(Map::new(&env));
 
-        for i in 0..predictions.len() {
-            if let Some(pred) = predictions.get(i) {
-                if pred.user == user {
-                    return Some(pred);
-                }
-            }
-        }
-        None
+        predictions.get(user)
     }
 
     /// Returns all precision predictions for the current round
     pub fn get_precision_predictions(env: Env) -> Vec<PrecisionPrediction> {
-        env.storage()
+        let predictions: Map<Address, PrecisionPrediction> = env.storage()
             .persistent()
             .get(&DataKey::PrecisionPositions)
-            .unwrap_or(Vec::new(&env))
+            .unwrap_or(Map::new(&env));
+        predictions.values()
     }
 
     /// Returns all Up/Down positions for the current round
@@ -450,10 +440,11 @@ impl VirtualTokenContract {
     /// Resolves Precision/Legends mode round
     /// Awards full pot to closest guess(es); ties split evenly
     fn _resolve_precision_mode(env: &Env, final_price: u128) -> Result<(), ContractError> {
-        let predictions: Vec<PrecisionPrediction> = env.storage()
+        let predictions_map: Map<Address, PrecisionPrediction> = env.storage()
             .persistent()
             .get(&DataKey::PrecisionPositions)
-            .unwrap_or(Vec::new(env));
+            .unwrap_or(Map::new(env));
+        let predictions = predictions_map.values();
 
         // If no predictions, nothing to resolve
         if predictions.is_empty() {
