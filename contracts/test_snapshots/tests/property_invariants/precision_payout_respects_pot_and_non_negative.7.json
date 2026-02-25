@@ -67,7 +67,7 @@
                         "symbol": "price"
                       },
                       "val": {
-                        "u128": "65906562"
+                        "u128": "75542197"
                       }
                     },
                     {
@@ -236,7 +236,7 @@
                   "symbol": "PendingWinnings"
                 },
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
                 }
               ]
             },
@@ -256,13 +256,13 @@
                       "symbol": "PendingWinnings"
                     },
                     {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4"
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
                     }
                   ]
                 },
                 "durability": "persistent",
                 "val": {
-                  "i128": "1424189172"
+                  "i128": "361810371"
                 }
               }
             },
@@ -430,7 +430,7 @@
                         "symbol": "best_streak"
                       },
                       "val": {
-                        "u32": 0
+                        "u32": 1
                       }
                     },
                     {
@@ -438,7 +438,7 @@
                         "symbol": "current_streak"
                       },
                       "val": {
-                        "u32": 0
+                        "u32": 1
                       }
                     },
                     {
@@ -446,7 +446,7 @@
                         "symbol": "total_losses"
                       },
                       "val": {
-                        "u32": 1
+                        "u32": 0
                       }
                     },
                     {
@@ -454,7 +454,7 @@
                         "symbol": "total_wins"
                       },
                       "val": {
-                        "u32": 0
+                        "u32": 1
                       }
                     }
                   ]
@@ -508,7 +508,7 @@
                         "symbol": "best_streak"
                       },
                       "val": {
-                        "u32": 1
+                        "u32": 0
                       }
                     },
                     {
@@ -516,7 +516,7 @@
                         "symbol": "current_streak"
                       },
                       "val": {
-                        "u32": 1
+                        "u32": 0
                       }
                     },
                     {
@@ -524,7 +524,7 @@
                         "symbol": "total_losses"
                       },
                       "val": {
-                        "u32": 0
+                        "u32": 1
                       }
                     },
                     {
@@ -532,7 +532,7 @@
                         "symbol": "total_wins"
                       },
                       "val": {
-                        "u32": 1
+                        "u32": 0
                       }
                     }
                   ]
