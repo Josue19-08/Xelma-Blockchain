@@ -470,6 +470,7 @@ impl VirtualTokenContract {
             .remove(&DataKey::PrecisionPositions);
 
         // Emit resolution event
+        #[allow(deprecated)]
         env.events().publish(
             (symbol_short!("round"), symbol_short!("resolved")),
             final_price,
