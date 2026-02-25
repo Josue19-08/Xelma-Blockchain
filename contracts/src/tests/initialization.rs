@@ -111,3 +111,33 @@ fn test_initialize_twice_fails() {
     let result = client.try_initialize(&admin, &oracle);
     assert_eq!(result, Err(Ok(ContractError::AlreadyInitialized)));
 }
+
+#[test]
+fn test_initialize_fails_without_admin_auth() {
+    let env = Env::default();
+    let contract_id = env.register(VirtualTokenContract, ());
+    let client = VirtualTokenContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let oracle = Address::generate(&env);
+
+    // We do NOT call env.mock_all_auths() here
+    // So admin.require_auth() should fail
+
+    let result = client.try_initialize(&admin, &oracle);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_mint_initial_fails_without_user_auth() {
+    let env = Env::default();
+    let contract_id = env.register(VirtualTokenContract, ());
+    let client = VirtualTokenContractClient::new(&env, &contract_id);
+    let user = Address::generate(&env);
+
+    // We do NOT call env.mock_all_auths() here
+    // So user.require_auth() should fail
+
+    let result = client.try_mint_initial(&user);
+    assert!(result.is_err());
+}
