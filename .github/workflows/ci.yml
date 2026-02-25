@@ -91,9 +91,15 @@ jobs:
           path: target/wasm32-unknown-unknown/release/hello_world.wasm
           retention-days: 7
 
+<<<<<<< HEAD
   # Job 3: TypeScript bindings build and test
   bindings-build:
     name: Bindings Build & Test
+=======
+  # Job 3: TypeScript bindings build
+  bindings-build:
+    name: Bindings Build
+>>>>>>> upstream/main
     runs-on: ubuntu-latest
     needs: contract-build
     steps:
@@ -103,20 +109,33 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
+<<<<<<< HEAD
           node-version: "18"
 
       - name: Install dependencies
         working-directory: bindings
         run: npm install
+=======
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: bindings/package-lock.json
+
+      - name: Install dependencies
+        working-directory: bindings
+        run: npm ci
+>>>>>>> upstream/main
 
       - name: Build TypeScript bindings
         working-directory: bindings
         run: npm run build
 
+<<<<<<< HEAD
       - name: Run integration tests
         working-directory: bindings
         run: npm test
 
+=======
+>>>>>>> upstream/main
       - name: Check build artifacts
         run: |
           if [ ! -f "bindings/dist/index.js" ] || [ ! -f "bindings/dist/index.d.ts" ]; then
@@ -163,16 +182,27 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
+<<<<<<< HEAD
           node-version: "18"
+=======
+          node-version: '18'
+>>>>>>> upstream/main
 
       - name: Verify WASM and bindings compatibility
         run: |
           echo "Checking WASM file..."
           ls -lh target/wasm32-unknown-unknown/release/hello_world.wasm
+<<<<<<< HEAD
 
           echo "Checking bindings..."
           ls -lh bindings/dist/
 
+=======
+          
+          echo "Checking bindings..."
+          ls -lh bindings/dist/
+          
+>>>>>>> upstream/main
           echo "Verifying TypeScript types exist..."
           if grep -q "export.*Client" bindings/dist/index.d.ts; then
             echo "✓ Client export found in type definitions"
@@ -180,14 +210,22 @@ jobs:
             echo "✗ Client export not found"
             exit 1
           fi
+<<<<<<< HEAD
 
+=======
+          
+>>>>>>> upstream/main
           if grep -q "export.*BetSide" bindings/dist/index.d.ts; then
             echo "✓ BetSide export found in type definitions"
           else
             echo "✗ BetSide export not found"
             exit 1
           fi
+<<<<<<< HEAD
 
+=======
+          
+>>>>>>> upstream/main
           echo "✓ Parity check passed: Contract and bindings are compatible"
 
   # Job 5: Format check
@@ -211,8 +249,12 @@ jobs:
   ci-success:
     name: CI Success
     runs-on: ubuntu-latest
+<<<<<<< HEAD
     needs:
       [rust-test, contract-build, bindings-build, parity-check, format-check]
+=======
+    needs: [rust-test, contract-build, bindings-build, parity-check, format-check]
+>>>>>>> upstream/main
     if: always()
     steps:
       - name: Check all jobs status
