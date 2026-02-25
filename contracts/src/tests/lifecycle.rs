@@ -2,33 +2,36 @@
 
 use crate::contract::{VirtualTokenContract, VirtualTokenContractClient};
 use crate::errors::ContractError;
-use crate::types::{BetSide, DataKey, Round, UserPosition};
-use soroban_sdk::{testutils::{Address as _, Ledger as _}, Address, Env, Map};
+use crate::types::{BetSide, DataKey, OraclePayload, Round, UserPosition};
+use soroban_sdk::{
+    testutils::{Address as _, Ledger as _},
+    Address, Env, IntoVal, Map,
+};
 
 #[test]
 fn test_create_round() {
     let env = Env::default();
     let contract_id = env.register(VirtualTokenContract, ());
     let client = VirtualTokenContractClient::new(&env, &contract_id);
-    
+
     // Set up admin
     let admin = Address::generate(&env);
     let oracle = Address::generate(&env);
     env.mock_all_auths();
     client.initialize(&admin, &oracle);
-    
+
     // Create a round
     let start_price: u128 = 1_5000000; // 1.5 XLM in stroops
-    
+
     client.create_round(&start_price, &None);
-    
+
     // Verify the round was created
     let round = client.get_active_round().expect("Round should exist");
-    
+
     assert_eq!(round.price_start, start_price);
     assert_eq!(round.pool_up, 0);
     assert_eq!(round.pool_down, 0);
-    
+
     // Verify windows are set correctly (defaults: bet=6, run=12)
     // Note: In tests, current ledger starts at 0
     assert_eq!(round.bet_end_ledger, 6);
@@ -36,13 +39,44 @@ fn test_create_round() {
 }
 
 #[test]
+fn test_create_round_while_active_fails() {
+    let env = Env::default();
+    let contract_id = env.register(VirtualTokenContract, ());
+    let client = VirtualTokenContractClient::new(&env, &contract_id);
+
+    // Set up admin and oracle
+    let admin = Address::generate(&env);
+    let oracle = Address::generate(&env);
+    env.mock_all_auths();
+    client.initialize(&admin, &oracle);
+
+    // Create first round successfully
+    let start_price: u128 = 1_5000000;
+    client.create_round(&start_price, &None);
+
+    // Capture current active round for later comparison
+    let existing_round = client.get_active_round().expect("Round should exist");
+
+    // Attempt to create a second round while first is still active
+    let result = client.try_create_round(&2_0000000, &None);
+    assert_eq!(result, Err(Ok(ContractError::RoundAlreadyActive)));
+
+    // Ensure the original round remains unchanged
+    let round_after = client.get_active_round().expect("Round should still exist");
+    assert_eq!(round_after.price_start, existing_round.price_start);
+    assert_eq!(round_after.start_ledger, existing_round.start_ledger);
+    assert_eq!(round_after.bet_end_ledger, existing_round.bet_end_ledger);
+    assert_eq!(round_after.end_ledger, existing_round.end_ledger);
+}
+
+#[test]
 fn test_create_round_without_init_fails() {
     let env = Env::default();
     let contract_id = env.register(VirtualTokenContract, ());
     let client = VirtualTokenContractClient::new(&env, &contract_id);
-    
+
     env.mock_all_auths();
-    
+
     // Try to create round without initializing - should return error
     let result = client.try_create_round(&1_0000000, &None);
     assert_eq!(result, Err(Ok(ContractError::AdminNotSet)));
@@ -53,10 +87,10 @@ fn test_get_active_round_when_none() {
     let env = Env::default();
     let contract_id = env.register(VirtualTokenContract, ());
     let client = VirtualTokenContractClient::new(&env, &contract_id);
-    
+
     // No round created yet
     let round = client.get_active_round();
-    
+
     assert_eq!(round, None);
 }
 
@@ -65,68 +99,72 @@ fn test_full_round_lifecycle() {
     let env = Env::default();
     let contract_id = env.register(VirtualTokenContract, ());
     let client = VirtualTokenContractClient::new(&env, &contract_id);
-    
+
     // Setup
     let admin = Address::generate(&env);
     let oracle = Address::generate(&env);
     let alice = Address::generate(&env);
     let bob = Address::generate(&env);
     let charlie = Address::generate(&env);
-    
+
     env.mock_all_auths();
-    
+
     // STEP 1: Initialize contract
     client.initialize(&admin, &oracle);
-    
+
     // STEP 2: Users get initial tokens
     client.mint_initial(&alice);
     client.mint_initial(&bob);
     client.mint_initial(&charlie);
-    
+
     assert_eq!(client.balance(&alice), 1000_0000000);
     assert_eq!(client.balance(&bob), 1000_0000000);
     assert_eq!(client.balance(&charlie), 1000_0000000);
-    
+
     // STEP 3: Admin creates a round
     let start_price: u128 = 1_0000000; // 1.0 XLM
     client.create_round(&start_price, &None);
-    
+
     let round = client.get_active_round().unwrap();
     assert_eq!(round.price_start, start_price);
     assert_eq!(round.pool_up, 0);
     assert_eq!(round.pool_down, 0);
-    
+
     // STEP 4: Users place bets
     client.place_bet(&alice, &100_0000000, &BetSide::Up);
     client.place_bet(&bob, &200_0000000, &BetSide::Up);
     client.place_bet(&charlie, &150_0000000, &BetSide::Down);
-    
+
     // Verify balances deducted
     assert_eq!(client.balance(&alice), 900_0000000);
     assert_eq!(client.balance(&bob), 800_0000000);
     assert_eq!(client.balance(&charlie), 850_0000000);
-    
+
     // Verify positions recorded
     let alice_pos = client.get_user_position(&alice).unwrap();
     assert_eq!(alice_pos.amount, 100_0000000);
     assert_eq!(alice_pos.side, BetSide::Up);
-    
+
     // Verify pools updated
     let round = client.get_active_round().unwrap();
     assert_eq!(round.pool_up, 300_0000000);
     assert_eq!(round.pool_down, 150_0000000);
-    
+
     // STEP 5: Oracle resolves round (price went UP)
     // Advance ledger to allow resolution
     env.ledger().with_mut(|li| {
         li.sequence_number = 12; // Default run window is 12
     });
     let final_price: u128 = 1_5000000; // 1.5 XLM
-    client.resolve_round(&final_price);
-    
+    client.resolve_round(&OraclePayload {
+        price: final_price,
+        timestamp: env.ledger().timestamp(),
+        round_id: 0,
+    });
+
     // Round should be cleared
     assert_eq!(client.get_active_round(), None);
-    
+
     // STEP 6: Verify pending winnings
     // Alice: 100 + (100/300)*150 = 150
     // Bob: 200 + (200/300)*150 = 300
@@ -134,28 +172,28 @@ fn test_full_round_lifecycle() {
     assert_eq!(client.get_pending_winnings(&alice), 150_0000000);
     assert_eq!(client.get_pending_winnings(&bob), 300_0000000);
     assert_eq!(client.get_pending_winnings(&charlie), 0);
-    
+
     // STEP 7: Verify stats updated
     let alice_stats = client.get_user_stats(&alice);
     assert_eq!(alice_stats.total_wins, 1);
     assert_eq!(alice_stats.current_streak, 1);
-    
+
     let charlie_stats = client.get_user_stats(&charlie);
     assert_eq!(charlie_stats.total_losses, 1);
     assert_eq!(charlie_stats.current_streak, 0);
-    
+
     // STEP 8: Users claim winnings
     let alice_claimed = client.claim_winnings(&alice);
     let bob_claimed = client.claim_winnings(&bob);
-    
+
     assert_eq!(alice_claimed, 150_0000000);
     assert_eq!(bob_claimed, 300_0000000);
-    
+
     // STEP 9: Verify final balances
     assert_eq!(client.balance(&alice), 1050_0000000); // 900 + 150
-    assert_eq!(client.balance(&bob), 1100_0000000);   // 800 + 300
+    assert_eq!(client.balance(&bob), 1100_0000000); // 800 + 300
     assert_eq!(client.balance(&charlie), 850_0000000); // Lost 150
-    
+
     // STEP 10: Pending winnings cleared
     assert_eq!(client.get_pending_winnings(&alice), 0);
     assert_eq!(client.get_pending_winnings(&bob), 0);
@@ -166,72 +204,259 @@ fn test_multiple_rounds_lifecycle() {
     let env = Env::default();
     let contract_id = env.register(VirtualTokenContract, ());
     let client = VirtualTokenContractClient::new(&env, &contract_id);
-    
+
     let admin = Address::generate(&env);
     let oracle = Address::generate(&env);
     let alice = Address::generate(&env);
-    
+
     env.mock_all_auths();
-    
+
     client.initialize(&admin, &oracle);
     client.mint_initial(&alice);
-    
+
     // ROUND 1: Alice bets UP and wins
     client.create_round(&1_0000000, &None);
     client.place_bet(&alice, &100_0000000, &BetSide::Up);
-    
+
     env.as_contract(&contract_id, || {
         let mut positions = Map::<Address, UserPosition>::new(&env);
-        positions.set(alice.clone(), UserPosition {
-            amount: 100_0000000,
-            side: BetSide::Up,
-        });
-        env.storage().persistent().set(&DataKey::Positions, &positions);
-        
-        let mut round: Round = env.storage().persistent().get(&DataKey::ActiveRound).unwrap();
+        positions.set(
+            alice.clone(),
+            UserPosition {
+                amount: 100_0000000,
+                side: BetSide::Up,
+            },
+        );
+        env.storage()
+            .persistent()
+            .set(&DataKey::Positions, &positions);
+
+        let mut round: Round = env
+            .storage()
+            .persistent()
+            .get(&DataKey::ActiveRound)
+            .unwrap();
         round.pool_up = 100_0000000;
         round.pool_down = 50_0000000;
-        env.storage().persistent().set(&DataKey::ActiveRound, &round);
+        env.storage()
+            .persistent()
+            .set(&DataKey::ActiveRound, &round);
     });
-    
+
     // Advance ledger to allow resolution
     env.ledger().with_mut(|li| {
         li.sequence_number = 12;
     });
-    client.resolve_round(&1_5000000); // UP wins
+    let round1 = client.get_active_round().unwrap();
+    client.resolve_round(&OraclePayload {
+        price: 1_5000000, // UP wins
+        timestamp: env.ledger().timestamp(),
+        round_id: round1.start_ledger,
+    });
     client.claim_winnings(&alice);
-    
+
     let stats = client.get_user_stats(&alice);
     assert_eq!(stats.total_wins, 1);
     assert_eq!(stats.current_streak, 1);
-    
+
     // ROUND 2: Alice bets DOWN and wins again
     client.create_round(&2_0000000, &None);
     client.place_bet(&alice, &100_0000000, &BetSide::Down);
-    
+
     env.as_contract(&contract_id, || {
         let mut positions = Map::<Address, UserPosition>::new(&env);
-        positions.set(alice.clone(), UserPosition {
-            amount: 100_0000000,
-            side: BetSide::Down,
-        });
-        env.storage().persistent().set(&DataKey::Positions, &positions);
-        
-        let mut round: Round = env.storage().persistent().get(&DataKey::ActiveRound).unwrap();
+        positions.set(
+            alice.clone(),
+            UserPosition {
+                amount: 100_0000000,
+                side: BetSide::Down,
+            },
+        );
+        env.storage()
+            .persistent()
+            .set(&DataKey::Positions, &positions);
+
+        let mut round: Round = env
+            .storage()
+            .persistent()
+            .get(&DataKey::ActiveRound)
+            .unwrap();
         round.pool_up = 80_0000000;
         round.pool_down = 100_0000000;
-        env.storage().persistent().set(&DataKey::ActiveRound, &round);
+        env.storage()
+            .persistent()
+            .set(&DataKey::ActiveRound, &round);
     });
-    
+
     // Advance ledger to allow resolution
     env.ledger().with_mut(|li| {
         li.sequence_number = 24; // 12 + 12 for second round
     });
-    client.resolve_round(&1_5000000); // DOWN wins
-    
+    let round2 = client.get_active_round().unwrap();
+    client.resolve_round(&OraclePayload {
+        price: 1_5000000, // DOWN wins
+        timestamp: env.ledger().timestamp(),
+        round_id: round2.start_ledger,
+    });
+
     let stats = client.get_user_stats(&alice);
     assert_eq!(stats.total_wins, 2);
     assert_eq!(stats.current_streak, 2);
     assert_eq!(stats.best_streak, 2);
 }
 
+#[test]
+fn test_create_round_fails_without_admin_auth() {
+    let env = Env::default();
+    let contract_id = env.register(VirtualTokenContract, ());
+    let client = VirtualTokenContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let oracle = Address::generate(&env);
+
+    // Initialize with explicit auth
+    env.mock_auths(&[soroban_sdk::testutils::MockAuth {
+        address: &admin,
+        invoke: &soroban_sdk::testutils::MockAuthInvoke {
+            contract: &contract_id,
+            fn_name: "initialize",
+            args: (&admin, &oracle).into_val(&env),
+            sub_invokes: &[],
+        },
+    }]);
+    client.initialize(&admin, &oracle);
+
+    // No mocking all auths, so create_round should fail
+    let result = client.try_create_round(&1_0000000, &None);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_place_bet_fails_without_user_auth() {
+    let env = Env::default();
+    let contract_id = env.register(VirtualTokenContract, ());
+    let client = VirtualTokenContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let oracle = Address::generate(&env);
+    let user = Address::generate(&env);
+
+    // Explicitly auth setup calls
+    env.mock_auths(&[soroban_sdk::testutils::MockAuth {
+        address: &admin,
+        invoke: &soroban_sdk::testutils::MockAuthInvoke {
+            contract: &contract_id,
+            fn_name: "initialize",
+            args: (&admin, &oracle).into_val(&env),
+            sub_invokes: &[],
+        },
+    }]);
+    client.initialize(&admin, &oracle);
+
+    env.mock_auths(&[soroban_sdk::testutils::MockAuth {
+        address: &user,
+        invoke: &soroban_sdk::testutils::MockAuthInvoke {
+            contract: &contract_id,
+            fn_name: "mint_initial",
+            args: (&user,).into_val(&env),
+            sub_invokes: &[],
+        },
+    }]);
+    client.mint_initial(&user);
+
+    env.mock_auths(&[soroban_sdk::testutils::MockAuth {
+        address: &admin,
+        invoke: &soroban_sdk::testutils::MockAuthInvoke {
+            contract: &contract_id,
+            fn_name: "create_round",
+            args: (1_0000000u128, Option::<u32>::None).into_val(&env),
+            sub_invokes: &[],
+        },
+    }]);
+    client.create_round(&1_0000000, &None);
+
+    // Attempt to place bet without user auth
+    let result = client.try_place_bet(&user, &100_0000000, &BetSide::Up);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_resolve_round_fails_without_oracle_auth() {
+    let env = Env::default();
+    let contract_id = env.register(VirtualTokenContract, ());
+    let client = VirtualTokenContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let oracle = Address::generate(&env);
+
+    env.mock_auths(&[soroban_sdk::testutils::MockAuth {
+        address: &admin,
+        invoke: &soroban_sdk::testutils::MockAuthInvoke {
+            contract: &contract_id,
+            fn_name: "initialize",
+            args: (&admin, &oracle).into_val(&env),
+            sub_invokes: &[],
+        },
+    }]);
+    client.initialize(&admin, &oracle);
+
+    env.mock_auths(&[soroban_sdk::testutils::MockAuth {
+        address: &admin,
+        invoke: &soroban_sdk::testutils::MockAuthInvoke {
+            contract: &contract_id,
+            fn_name: "create_round",
+            args: (1_0000000u128, Option::<u32>::None).into_val(&env),
+            sub_invokes: &[],
+        },
+    }]);
+    client.create_round(&1_0000000, &None);
+
+    env.ledger().with_mut(|li| {
+        li.sequence_number = 12;
+    });
+
+    // Attempt to resolve round without oracle auth
+    let result = client.try_resolve_round(&OraclePayload {
+        price: 1_1000000,
+        timestamp: env.ledger().timestamp(),
+        round_id: 0,
+    });
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_claim_winnings_fails_without_user_auth() {
+    let env = Env::default();
+    let contract_id = env.register(VirtualTokenContract, ());
+    let client = VirtualTokenContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let oracle = Address::generate(&env);
+    let user = Address::generate(&env);
+
+    env.mock_auths(&[soroban_sdk::testutils::MockAuth {
+        address: &admin,
+        invoke: &soroban_sdk::testutils::MockAuthInvoke {
+            contract: &contract_id,
+            fn_name: "initialize",
+            args: (&admin, &oracle).into_val(&env),
+            sub_invokes: &[],
+        },
+    }]);
+    client.initialize(&admin, &oracle);
+
+    env.mock_auths(&[soroban_sdk::testutils::MockAuth {
+        address: &user,
+        invoke: &soroban_sdk::testutils::MockAuthInvoke {
+            contract: &contract_id,
+            fn_name: "mint_initial",
+            args: (&user,).into_val(&env),
+            sub_invokes: &[],
+        },
+    }]);
+    client.mint_initial(&user);
+
+    // Attempt to claim winnings without user auth
+    let result = client.try_claim_winnings(&user);
+    assert!(result.is_err());
+}

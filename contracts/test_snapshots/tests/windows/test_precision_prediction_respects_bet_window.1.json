@@ -463,34 +463,39 @@
                 },
                 "durability": "persistent",
                 "val": {
-                  "vec": [
+                  "map": [
                     {
-                      "map": [
-                        {
-                          "key": {
-                            "symbol": "amount"
+                      "key": {
+                        "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                      },
+                      "val": {
+                        "map": [
+                          {
+                            "key": {
+                              "symbol": "amount"
+                            },
+                            "val": {
+                              "i128": "1000000000"
+                            }
                           },
-                          "val": {
-                            "i128": "1000000000"
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "predicted_price"
+                          {
+                            "key": {
+                              "symbol": "predicted_price"
+                            },
+                            "val": {
+                              "u128": "2297"
+                            }
                           },
-                          "val": {
-                            "u128": "2297"
+                          {
+                            "key": {
+                              "symbol": "user"
+                            },
+                            "val": {
+                              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                            }
                           }
-                        },
-                        {
-                          "key": {
-                            "symbol": "user"
-                          },
-                          "val": {
-                            "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-                          }
-                        }
-                      ]
+                        ]
+                      }
                     }
                   ]
                 }

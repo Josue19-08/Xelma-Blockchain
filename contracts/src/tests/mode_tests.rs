@@ -2,8 +2,11 @@
 
 use crate::contract::{VirtualTokenContract, VirtualTokenContractClient};
 use crate::errors::ContractError;
-use crate::types::{BetSide, RoundMode};
-use soroban_sdk::{testutils::{Address as _, Ledger as _, Events}, Address, Env};
+use crate::types::{BetSide, OraclePayload, RoundMode};
+use soroban_sdk::{
+    testutils::{Address as _, Events, Ledger as _},
+    Address, Env,
+};
 
 #[test]
 fn test_create_round_default_mode() {
@@ -239,17 +242,24 @@ fn test_get_precision_predictions() {
     let predictions = client.get_precision_predictions();
     assert_eq!(predictions.len(), 2);
 
-    // Verify first prediction (alice)
-    let pred0 = predictions.get(0).unwrap();
-    assert_eq!(pred0.user, alice);
-    assert_eq!(pred0.amount, 100_0000000);
-    assert_eq!(pred0.predicted_price, 2297);
+    // Verify both predictions exist regardless of order
+    let mut found_alice = false;
+    let mut found_bob = false;
 
-    // Verify second prediction (bob)
-    let pred1 = predictions.get(1).unwrap();
-    assert_eq!(pred1.user, bob);
-    assert_eq!(pred1.amount, 150_0000000);
-    assert_eq!(pred1.predicted_price, 2500);
+    for pred in predictions.iter() {
+        if pred.user == alice {
+            assert_eq!(pred.amount, 100_0000000);
+            assert_eq!(pred.predicted_price, 2297);
+            found_alice = true;
+        } else if pred.user == bob {
+            assert_eq!(pred.amount, 150_0000000);
+            assert_eq!(pred.predicted_price, 2500);
+            found_bob = true;
+        }
+    }
+
+    assert!(found_alice, "Alice's prediction not found");
+    assert!(found_bob, "Bob's prediction not found");
 }
 
 #[test]
@@ -428,16 +438,29 @@ fn test_predict_price_valid_scales() {
     for price in test_cases.iter() {
         let user = Address::generate(&env);
         client.mint_initial(&user);
-        
-        // Create new round for each test
+
+        // If a previous round is still active, resolve it before creating a new one
+        if let Some(round) = client.get_active_round() {
+            env.ledger().with_mut(|li| {
+                li.sequence_number = round.end_ledger;
+            });
+            client.resolve_round(&OraclePayload {
+                price: round.price_start,
+                timestamp: env.ledger().timestamp(),
+                round_id: round.start_ledger,
+            });
+        }
+
+        // Create new Precision round for each test case
+
         client.create_round(&1_0000000, &Some(1));
-        
+
         // Should succeed with valid price scale
         client.predict_price(&user, price, &100_0000000);
-        
+
         let prediction = client.get_user_precision_prediction(&user).unwrap();
         assert_eq!(prediction.predicted_price, *price);
-        
+
         // Clean up for next iteration
         env.ledger().with_mut(|li| {
             li.sequence_number += 20;
@@ -495,8 +518,8 @@ fn test_predict_price_event_emission() {
 
     // Verify event was emitted
     let events = env.events().all();
-    
-    // Should have events (at least the prediction event)
-    assert!(events.len() > 0);
-}
 
+    // Should have events (at least the prediction event)
+    assert!(!events.is_empty());
+    assert!(!events.is_empty());
+}
