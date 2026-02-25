@@ -40,17 +40,15 @@ fn test_set_windows_fails_without_admin_auth() {
     let oracle = Address::generate(&env);
 
     // Initialize contract with explicit auth instead of mock_all_auths
-    env.mock_auths(&[
-        soroban_sdk::testutils::MockAuth {
-            address: &admin,
-            invoke: &soroban_sdk::testutils::MockAuthInvoke {
-                contract: &contract_id,
-                fn_name: "initialize",
-                args: (&admin, &oracle).into_val(&env),
-                sub_invokes: &[],
-            },
+    env.mock_auths(&[soroban_sdk::testutils::MockAuth {
+        address: &admin,
+        invoke: &soroban_sdk::testutils::MockAuthInvoke {
+            contract: &contract_id,
+            fn_name: "initialize",
+            args: (&admin, &oracle).into_val(&env),
+            sub_invokes: &[],
         },
-    ]);
+    }]);
     client.initialize(&admin, &oracle);
 
     // Attempting to set windows without admin auth
@@ -72,17 +70,15 @@ fn test_set_windows_fails_with_wrong_auth() {
     client.initialize(&admin, &oracle);
 
     // We only provide auth for malicious_user, but the contract expects admin auth
-    env.mock_auths(&[
-        soroban_sdk::testutils::MockAuth {
-            address: &malicious_user,
-            invoke: &soroban_sdk::testutils::MockAuthInvoke {
-                contract: &contract_id,
-                fn_name: "set_windows",
-                args: (10u32, 20u32).into_val(&env),
-                sub_invokes: &[],
-            },
+    env.mock_auths(&[soroban_sdk::testutils::MockAuth {
+        address: &malicious_user,
+        invoke: &soroban_sdk::testutils::MockAuthInvoke {
+            contract: &contract_id,
+            fn_name: "set_windows",
+            args: (10u32, 20u32).into_val(&env),
+            sub_invokes: &[],
         },
-    ]);
+    }]);
 
     let result = client.try_set_windows(&10, &20);
     assert!(result.is_err());
@@ -350,43 +346,37 @@ fn test_place_precision_prediction_fails_without_user_auth() {
     let user = Address::generate(&env);
 
     // Setup with explicit auth
-    env.mock_auths(&[
-        soroban_sdk::testutils::MockAuth {
-            address: &admin,
-            invoke: &soroban_sdk::testutils::MockAuthInvoke {
-                contract: &contract_id,
-                fn_name: "initialize",
-                args: (&admin, &oracle).into_val(&env),
-                sub_invokes: &[],
-            },
+    env.mock_auths(&[soroban_sdk::testutils::MockAuth {
+        address: &admin,
+        invoke: &soroban_sdk::testutils::MockAuthInvoke {
+            contract: &contract_id,
+            fn_name: "initialize",
+            args: (&admin, &oracle).into_val(&env),
+            sub_invokes: &[],
         },
-    ]);
+    }]);
     client.initialize(&admin, &oracle);
 
-    env.mock_auths(&[
-        soroban_sdk::testutils::MockAuth {
-            address: &user,
-            invoke: &soroban_sdk::testutils::MockAuthInvoke {
-                contract: &contract_id,
-                fn_name: "mint_initial",
-                args: (&user,).into_val(&env),
-                sub_invokes: &[],
-            },
+    env.mock_auths(&[soroban_sdk::testutils::MockAuth {
+        address: &user,
+        invoke: &soroban_sdk::testutils::MockAuthInvoke {
+            contract: &contract_id,
+            fn_name: "mint_initial",
+            args: (&user,).into_val(&env),
+            sub_invokes: &[],
         },
-    ]);
+    }]);
     client.mint_initial(&user);
 
-    env.mock_auths(&[
-        soroban_sdk::testutils::MockAuth {
-            address: &admin,
-            invoke: &soroban_sdk::testutils::MockAuthInvoke {
-                contract: &contract_id,
-                fn_name: "create_round",
-                args: (1_0000000u128, Some(1u32)).into_val(&env),
-                sub_invokes: &[],
-            },
+    env.mock_auths(&[soroban_sdk::testutils::MockAuth {
+        address: &admin,
+        invoke: &soroban_sdk::testutils::MockAuthInvoke {
+            contract: &contract_id,
+            fn_name: "create_round",
+            args: (1_0000000u128, Some(1u32)).into_val(&env),
+            sub_invokes: &[],
         },
-    ]);
+    }]);
     client.create_round(&1_0000000, &Some(1));
 
     // Attempt to place precision prediction without user auth

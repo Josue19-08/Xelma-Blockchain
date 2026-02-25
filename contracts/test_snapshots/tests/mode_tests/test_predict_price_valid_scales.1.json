@@ -842,34 +842,39 @@
                 },
                 "durability": "persistent",
                 "val": {
-                  "vec": [
+                  "map": [
                     {
-                      "map": [
-                        {
-                          "key": {
-                            "symbol": "amount"
+                      "key": {
+                        "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARQG5"
+                      },
+                      "val": {
+                        "map": [
+                          {
+                            "key": {
+                              "symbol": "amount"
+                            },
+                            "val": {
+                              "i128": "1000000000"
+                            }
                           },
-                          "val": {
-                            "i128": "1000000000"
-                          }
-                        },
-                        {
-                          "key": {
-                            "symbol": "predicted_price"
+                          {
+                            "key": {
+                              "symbol": "predicted_price"
+                            },
+                            "val": {
+                              "u128": "99999999"
+                            }
                           },
-                          "val": {
-                            "u128": "99999999"
+                          {
+                            "key": {
+                              "symbol": "user"
+                            },
+                            "val": {
+                              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARQG5"
+                            }
                           }
-                        },
-                        {
-                          "key": {
-                            "symbol": "user"
-                          },
-                          "val": {
-                            "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARQG5"
-                          }
-                        }
-                      ]
+                        ]
+                      }
                     }
                   ]
                 }

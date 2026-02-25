@@ -132,11 +132,12 @@ fn test_accumulate_pending_winnings() {
     env.ledger().with_mut(|li| {
         li.sequence_number = 12;
     });
+    let round1 = client.get_active_round().unwrap();
     client.resolve_round(&OraclePayload {
-        price: 1_5000000,
+        price: 1_5000000, // UP wins
         timestamp: env.ledger().timestamp(),
-        round_id: 0,
-    }); // UP wins
+        round_id: round1.start_ledger,
+    });
 
     let first_pending = client.get_pending_winnings(&alice);
     assert!(first_pending > 0);
@@ -149,11 +150,12 @@ fn test_accumulate_pending_winnings() {
     env.ledger().with_mut(|li| {
         li.sequence_number = 24; // 12 + 12 for second round
     });
+    let round2 = client.get_active_round().unwrap();
     client.resolve_round(&OraclePayload {
-        price: 2_0000000,
+        price: 2_0000000, // Price unchanged - refund
         timestamp: env.ledger().timestamp(),
-        round_id: 12, // Round 2 started at ledger 12
-    }); // Price unchanged - refund
+        round_id: round2.start_ledger,
+    });
 
     // Should have accumulated pending from both rounds
     let total_pending = client.get_pending_winnings(&alice);

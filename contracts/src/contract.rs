@@ -320,7 +320,8 @@ impl VirtualTokenContract {
         }
 
         // Check if user already has a prediction in this round
-        let mut predictions: Map<Address, PrecisionPrediction> = env.storage()
+        let mut predictions: Map<Address, PrecisionPrediction> = env
+            .storage()
             .persistent()
             .get(&DataKey::PrecisionPositions)
             .unwrap_or(Map::new(&env));
@@ -381,7 +382,8 @@ impl VirtualTokenContract {
 
     /// Returns user's precision prediction in the current round (Precision mode)
     pub fn get_user_precision_prediction(env: Env, user: Address) -> Option<PrecisionPrediction> {
-        let predictions: Map<Address, PrecisionPrediction> = env.storage()
+        let predictions: Map<Address, PrecisionPrediction> = env
+            .storage()
             .persistent()
             .get(&DataKey::PrecisionPositions)
             .unwrap_or(Map::new(&env));
@@ -391,7 +393,8 @@ impl VirtualTokenContract {
 
     /// Returns all precision predictions for the current round
     pub fn get_precision_predictions(env: Env) -> Vec<PrecisionPrediction> {
-        let predictions: Map<Address, PrecisionPrediction> = env.storage()
+        let predictions: Map<Address, PrecisionPrediction> = env
+            .storage()
             .persistent()
             .get(&DataKey::PrecisionPositions)
             .unwrap_or(Map::new(&env));
@@ -406,13 +409,10 @@ impl VirtualTokenContract {
             .unwrap_or(Map::new(&env))
     }
 
-    /// Resolves the round with final price (oracle only)
+    /// Resolves the round with oracle payload (oracle only)
     /// Mode 0 (Up/Down): Winners split losers' pool proportionally; ties get refunds
     /// Mode 1 (Precision/Legends): Closest guess wins full pot; ties split evenly
-    pub fn resolve_round(
-        env: Env,
-        payload: OraclePayload,
-    ) -> Result<(), ContractError> {
+    pub fn resolve_round(env: Env, payload: OraclePayload) -> Result<(), ContractError> {
         if payload.price == 0 {
             return Err(ContractError::InvalidPrice);
         }
@@ -512,7 +512,8 @@ impl VirtualTokenContract {
     /// Resolves Precision/Legends mode round
     /// Awards full pot to closest guess(es); ties split evenly
     fn _resolve_precision_mode(env: &Env, final_price: u128) -> Result<(), ContractError> {
-        let predictions_map: Map<Address, PrecisionPrediction> = env.storage()
+        let predictions_map: Map<Address, PrecisionPrediction> = env
+            .storage()
             .persistent()
             .get(&DataKey::PrecisionPositions)
             .unwrap_or(Map::new(env));

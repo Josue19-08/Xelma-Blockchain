@@ -20,8 +20,8 @@ pub enum DataKey {
     Oracle,
     ActiveRound,
     Positions,
-    UpDownPositions,      // Map<Address, UserPosition> for Up/Down mode
-    PrecisionPositions,   // Map<Address, PrecisionPrediction> for Precision mode
+    UpDownPositions,    // Map<Address, UserPosition> for Up/Down mode
+    PrecisionPositions, // Map<Address, PrecisionPrediction> for Precision mode
     PendingWinnings(Address),
     UserStats(Address),
     BetWindowLedgers, // Bet window duration in ledgers
@@ -61,13 +61,13 @@ pub struct PrecisionPrediction {
     pub amount: i128,          // Bet amount
 }
 
-/// Oracle payload including price, timestamp and target round
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
 pub struct OraclePayload {
     pub price: u128,
     pub timestamp: u64,
-    pub round_id: u32, // Matches Round.start_ledger
+    /// Round identifier that should match `Round.start_ledger`
+    pub round_id: u32,
 }
 
 #[contracttype]
