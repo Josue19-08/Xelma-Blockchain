@@ -2,7 +2,7 @@
 
 use crate::contract::{VirtualTokenContract, VirtualTokenContractClient};
 use crate::errors::ContractError;
-use crate::types::BetSide;
+use crate::types::{BetSide, OraclePayload};
 use soroban_sdk::{
     testutils::{Address as _, Ledger as _},
     Address, Env,
@@ -219,7 +219,11 @@ fn test_resolution_only_allowed_after_run_ledgers() {
     });
 
     // Resolution should fail before end_ledger
-    let result = client.try_resolve_round(&1_5000000);
+    let result = client.try_resolve_round(&OraclePayload {
+        price: 1_5000000,
+        timestamp: env.ledger().timestamp(),
+        round_id: 0,
+    });
     assert_eq!(result, Err(Ok(ContractError::RoundNotEnded)));
 
     // Advance to end_ledger
@@ -228,7 +232,11 @@ fn test_resolution_only_allowed_after_run_ledgers() {
     });
 
     // Resolution should succeed
-    client.resolve_round(&1_5000000);
+    client.resolve_round(&OraclePayload {
+        price: 1_5000000,
+        timestamp: env.ledger().timestamp(),
+        round_id: 0,
+    });
 
     // Round should be cleared
     assert_eq!(client.get_active_round(), None);
