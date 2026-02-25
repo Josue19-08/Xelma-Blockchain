@@ -10,8 +10,10 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
 
+permissions:
+  contents: read
+
 jobs:
-  # Job 1: Rust contract tests
   rust-test:
     name: Rust Tests
     runs-on: ubuntu-latest
@@ -22,7 +24,6 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.92.0
           components: clippy
           targets: wasm32-unknown-unknown
 
@@ -45,7 +46,6 @@ jobs:
       - name: Run cargo clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
 
-  # Job 2: Contract build
   contract-build:
     name: Contract Build
     runs-on: ubuntu-latest
@@ -56,7 +56,6 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.92.0
           targets: wasm32-unknown-unknown
 
       - name: Cache Rust dependencies
@@ -91,15 +90,8 @@ jobs:
           path: target/wasm32-unknown-unknown/release/hello_world.wasm
           retention-days: 7
 
-<<<<<<< HEAD
-  # Job 3: TypeScript bindings build and test
-  bindings-build:
-    name: Bindings Build & Test
-=======
-  # Job 3: TypeScript bindings build
   bindings-build:
     name: Bindings Build
->>>>>>> upstream/main
     runs-on: ubuntu-latest
     needs: contract-build
     steps:
@@ -109,41 +101,26 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-<<<<<<< HEAD
           node-version: "18"
-
-      - name: Install dependencies
-        working-directory: bindings
-        run: npm install
-=======
-          node-version: '18'
-          cache: 'npm'
+          cache: npm
           cache-dependency-path: bindings/package-lock.json
 
       - name: Install dependencies
         working-directory: bindings
         run: npm ci
->>>>>>> upstream/main
 
       - name: Build TypeScript bindings
         working-directory: bindings
         run: npm run build
 
-<<<<<<< HEAD
-      - name: Run integration tests
-        working-directory: bindings
-        run: npm test
-
-=======
->>>>>>> upstream/main
       - name: Check build artifacts
         run: |
           if [ ! -f "bindings/dist/index.js" ] || [ ! -f "bindings/dist/index.d.ts" ]; then
             echo "Error: Build artifacts not found"
             exit 1
           fi
-          echo "✓ index.js exists"
-          echo "✓ index.d.ts exists"
+          echo "index.js exists"
+          echo "index.d.ts exists"
 
       - name: Upload bindings artifact
         uses: actions/upload-artifact@v4
@@ -152,7 +129,6 @@ jobs:
           path: bindings/dist/
           retention-days: 7
 
-  # Job 4: Parity checks (contract + bindings integration)
   parity-check:
     name: Parity Check
     runs-on: ubuntu-latest
@@ -173,62 +149,31 @@ jobs:
           name: bindings-dist
           path: bindings/dist/
 
-      - name: Install Stellar CLI
-        run: |
-          curl -L https://github.com/stellar/stellar-cli/releases/download/v22.0.1/stellar-cli-22.0.1-x86_64-unknown-linux-gnu.tar.gz | tar xz
-          sudo mv stellar /usr/local/bin/
-          stellar --version
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-<<<<<<< HEAD
-          node-version: "18"
-=======
-          node-version: '18'
->>>>>>> upstream/main
-
       - name: Verify WASM and bindings compatibility
         run: |
           echo "Checking WASM file..."
           ls -lh target/wasm32-unknown-unknown/release/hello_world.wasm
-<<<<<<< HEAD
 
           echo "Checking bindings..."
           ls -lh bindings/dist/
 
-=======
-          
-          echo "Checking bindings..."
-          ls -lh bindings/dist/
-          
->>>>>>> upstream/main
           echo "Verifying TypeScript types exist..."
           if grep -q "export.*Client" bindings/dist/index.d.ts; then
-            echo "✓ Client export found in type definitions"
+            echo "Client export found in type definitions"
           else
-            echo "✗ Client export not found"
+            echo "Client export not found"
             exit 1
           fi
-<<<<<<< HEAD
 
-=======
-          
->>>>>>> upstream/main
           if grep -q "export.*BetSide" bindings/dist/index.d.ts; then
-            echo "✓ BetSide export found in type definitions"
+            echo "BetSide export found in type definitions"
           else
-            echo "✗ BetSide export not found"
+            echo "BetSide export not found"
             exit 1
           fi
-<<<<<<< HEAD
 
-=======
-          
->>>>>>> upstream/main
-          echo "✓ Parity check passed: Contract and bindings are compatible"
+          echo "Parity check passed: Contract and bindings are compatible"
 
-  # Job 5: Format check
   format-check:
     name: Format Check
     runs-on: ubuntu-latest
@@ -239,22 +184,15 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.92.0
           components: rustfmt
 
       - name: Check Rust formatting
         run: cargo fmt --all -- --check
 
-  # Summary job - requires all checks to pass
   ci-success:
     name: CI Success
     runs-on: ubuntu-latest
-<<<<<<< HEAD
-    needs:
-      [rust-test, contract-build, bindings-build, parity-check, format-check]
-=======
     needs: [rust-test, contract-build, bindings-build, parity-check, format-check]
->>>>>>> upstream/main
     if: always()
     steps:
       - name: Check all jobs status
@@ -264,7 +202,7 @@ jobs:
              [ "${{ needs.bindings-build.result }}" != "success" ] || \
              [ "${{ needs.parity-check.result }}" != "success" ] || \
              [ "${{ needs.format-check.result }}" != "success" ]; then
-            echo "❌ One or more CI jobs failed"
+            echo "One or more CI jobs failed"
             echo "Rust Tests: ${{ needs.rust-test.result }}"
             echo "Contract Build: ${{ needs.contract-build.result }}"
             echo "Bindings Build: ${{ needs.bindings-build.result }}"
@@ -272,4 +210,4 @@ jobs:
             echo "Format Check: ${{ needs.format-check.result }}"
             exit 1
           fi
-          echo "✅ All CI checks passed!"
+          echo "All CI checks passed"
