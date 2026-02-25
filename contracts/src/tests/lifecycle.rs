@@ -5,7 +5,7 @@ use crate::errors::ContractError;
 use crate::types::{BetSide, DataKey, OraclePayload, Round, UserPosition};
 use soroban_sdk::{
     testutils::{Address as _, Ledger as _},
-    Address, Env, Map,
+    Address, Env, IntoVal, Map,
 };
 
 #[test]
@@ -272,4 +272,176 @@ fn test_multiple_rounds_lifecycle() {
     assert_eq!(stats.total_wins, 2);
     assert_eq!(stats.current_streak, 2);
     assert_eq!(stats.best_streak, 2);
+}
+
+#[test]
+fn test_create_round_fails_without_admin_auth() {
+    let env = Env::default();
+    let contract_id = env.register(VirtualTokenContract, ());
+    let client = VirtualTokenContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let oracle = Address::generate(&env);
+    
+    // Initialize with explicit auth
+    env.mock_auths(&[
+        soroban_sdk::testutils::MockAuth {
+            address: &admin,
+            invoke: &soroban_sdk::testutils::MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "initialize",
+                args: (&admin, &oracle).into_val(&env),
+                sub_invokes: &[],
+            },
+        },
+    ]);
+    client.initialize(&admin, &oracle);
+
+    // No mocking all auths, so create_round should fail
+    let result = client.try_create_round(&1_0000000, &None);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_place_bet_fails_without_user_auth() {
+    let env = Env::default();
+    let contract_id = env.register(VirtualTokenContract, ());
+    let client = VirtualTokenContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let oracle = Address::generate(&env);
+    let user = Address::generate(&env);
+    
+    // Explicitly auth setup calls
+    env.mock_auths(&[
+        soroban_sdk::testutils::MockAuth {
+            address: &admin,
+            invoke: &soroban_sdk::testutils::MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "initialize",
+                args: (&admin, &oracle).into_val(&env),
+                sub_invokes: &[],
+            },
+        },
+    ]);
+    client.initialize(&admin, &oracle);
+
+    env.mock_auths(&[
+        soroban_sdk::testutils::MockAuth {
+            address: &user,
+            invoke: &soroban_sdk::testutils::MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "mint_initial",
+                args: (&user,).into_val(&env),
+                sub_invokes: &[],
+            },
+        },
+    ]);
+    client.mint_initial(&user);
+
+    env.mock_auths(&[
+        soroban_sdk::testutils::MockAuth {
+            address: &admin,
+            invoke: &soroban_sdk::testutils::MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "create_round",
+                args: (1_0000000u128, Option::<u32>::None).into_val(&env),
+                sub_invokes: &[],
+            },
+        },
+    ]);
+    client.create_round(&1_0000000, &None);
+
+    // Attempt to place bet without user auth
+    let result = client.try_place_bet(&user, &100_0000000, &BetSide::Up);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_resolve_round_fails_without_oracle_auth() {
+    let env = Env::default();
+    let contract_id = env.register(VirtualTokenContract, ());
+    let client = VirtualTokenContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let oracle = Address::generate(&env);
+    
+    env.mock_auths(&[
+        soroban_sdk::testutils::MockAuth {
+            address: &admin,
+            invoke: &soroban_sdk::testutils::MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "initialize",
+                args: (&admin, &oracle).into_val(&env),
+                sub_invokes: &[],
+            },
+        },
+    ]);
+    client.initialize(&admin, &oracle);
+
+    env.mock_auths(&[
+        soroban_sdk::testutils::MockAuth {
+            address: &admin,
+            invoke: &soroban_sdk::testutils::MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "create_round",
+                args: (1_0000000u128, Option::<u32>::None).into_val(&env),
+                sub_invokes: &[],
+            },
+        },
+    ]);
+    client.create_round(&1_0000000, &None);
+
+    env.ledger().with_mut(|li| {
+        li.sequence_number = 12;
+    });
+
+    // Attempt to resolve round without oracle auth
+    let result = client.try_resolve_round(&OraclePayload {
+        price: 1_1000000,
+        timestamp: env.ledger().timestamp(),
+        round_id: 0,
+    });
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_claim_winnings_fails_without_user_auth() {
+    let env = Env::default();
+    let contract_id = env.register(VirtualTokenContract, ());
+    let client = VirtualTokenContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let oracle = Address::generate(&env);
+    let user = Address::generate(&env);
+    
+    env.mock_auths(&[
+        soroban_sdk::testutils::MockAuth {
+            address: &admin,
+            invoke: &soroban_sdk::testutils::MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "initialize",
+                args: (&admin, &oracle).into_val(&env),
+                sub_invokes: &[],
+            },
+        },
+    ]);
+    client.initialize(&admin, &oracle);
+
+    env.mock_auths(&[
+        soroban_sdk::testutils::MockAuth {
+            address: &user,
+            invoke: &soroban_sdk::testutils::MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "mint_initial",
+                args: (&user,).into_val(&env),
+                sub_invokes: &[],
+            },
+        },
+    ]);
+    client.mint_initial(&user);
+    
+    // Attempt to claim winnings without user auth
+    let result = client.try_claim_winnings(&user);
+    assert!(result.is_err());
 }

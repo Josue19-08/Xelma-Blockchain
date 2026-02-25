@@ -7,4 +7,5 @@ mod lifecycle;
 mod mode_tests;
 mod property_invariants;
 mod resolution;
+mod security;
 mod windows;

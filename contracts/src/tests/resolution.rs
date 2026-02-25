@@ -2,9 +2,7 @@
 
 use crate::contract::{VirtualTokenContract, VirtualTokenContractClient};
 use crate::errors::ContractError;
-use crate::types::{
-    BetSide, DataKey, OraclePayload, PrecisionPrediction, Round, UserPosition,
-};
+use crate::types::{BetSide, DataKey, OraclePayload, PrecisionPrediction, Round, UserPosition};
 use soroban_sdk::{
     testutils::{Address as _, Ledger as _},
     Address, Env, Map, Vec,
@@ -406,28 +404,37 @@ fn test_resolve_precision_closest_guess_wins() {
 
     // Manually create precision predictions using as_contract
     env.as_contract(&contract_id, || {
-        let mut predictions = Vec::<PrecisionPrediction>::new(&env);
+        let mut predictions = Map::<Address, PrecisionPrediction>::new(&env);
 
         // Alice guesses 2297 (closest to actual 2298 - diff 1)
-        predictions.push_back(PrecisionPrediction {
-            user: alice.clone(),
-            predicted_price: 2297,
-            amount: 100_0000000,
-        });
+        predictions.set(
+            alice.clone(),
+            PrecisionPrediction {
+                user: alice.clone(),
+                predicted_price: 2297,
+                amount: 100_0000000,
+            },
+        );
 
         // Bob guesses 2300 (diff 2 from actual 2298)
-        predictions.push_back(PrecisionPrediction {
-            user: bob.clone(),
-            predicted_price: 2300,
-            amount: 150_0000000,
-        });
+        predictions.set(
+            bob.clone(),
+            PrecisionPrediction {
+                user: bob.clone(),
+                predicted_price: 2300,
+                amount: 150_0000000,
+            },
+        );
 
         // Charlie guesses 2500 (far off - diff 202)
-        predictions.push_back(PrecisionPrediction {
-            user: charlie.clone(),
-            predicted_price: 2500,
-            amount: 50_0000000,
-        });
+        predictions.set(
+            charlie.clone(),
+            PrecisionPrediction {
+                user: charlie.clone(),
+                predicted_price: 2500,
+                amount: 50_0000000,
+            },
+        );
 
         env.storage()
             .persistent()
@@ -489,28 +496,37 @@ fn test_resolve_precision_tie_splits_pot() {
 
     // Create tied predictions
     env.as_contract(&contract_id, || {
-        let mut predictions = Vec::<PrecisionPrediction>::new(&env);
+        let mut predictions = Map::<Address, PrecisionPrediction>::new(&env);
 
         // Alice guesses 2100 (diff 100 from actual 2200)
-        predictions.push_back(PrecisionPrediction {
-            user: alice.clone(),
-            predicted_price: 2100,
-            amount: 100_0000000,
-        });
+        predictions.set(
+            alice.clone(),
+            PrecisionPrediction {
+                user: alice.clone(),
+                predicted_price: 2100,
+                amount: 100_0000000,
+            },
+        );
 
         // Bob guesses 2300 (diff 100 from actual 2200) - TIE with Alice
-        predictions.push_back(PrecisionPrediction {
-            user: bob.clone(),
-            predicted_price: 2300,
-            amount: 150_0000000,
-        });
+        predictions.set(
+            bob.clone(),
+            PrecisionPrediction {
+                user: bob.clone(),
+                predicted_price: 2300,
+                amount: 150_0000000,
+            },
+        );
 
         // Charlie guesses 2500 (diff 300 from actual 2200)
-        predictions.push_back(PrecisionPrediction {
-            user: charlie.clone(),
-            predicted_price: 2500,
-            amount: 50_0000000,
-        });
+        predictions.set(
+            charlie.clone(),
+            PrecisionPrediction {
+                user: charlie.clone(),
+                predicted_price: 2500,
+                amount: 50_0000000,
+            },
+        );
 
         env.storage()
             .persistent()
@@ -566,21 +582,27 @@ fn test_resolve_precision_exact_match() {
     client.mint_initial(&bob);
 
     env.as_contract(&contract_id, || {
-        let mut predictions = Vec::<PrecisionPrediction>::new(&env);
+        let mut predictions = Map::<Address, PrecisionPrediction>::new(&env);
 
         // Alice guesses exactly right (diff 0)
-        predictions.push_back(PrecisionPrediction {
-            user: alice.clone(),
-            predicted_price: 2250,
-            amount: 100_0000000,
-        });
+        predictions.set(
+            alice.clone(),
+            PrecisionPrediction {
+                user: alice.clone(),
+                predicted_price: 2250,
+                amount: 100_0000000,
+            },
+        );
 
         // Bob is off by 50
-        predictions.push_back(PrecisionPrediction {
-            user: bob.clone(),
-            predicted_price: 2200,
-            amount: 100_0000000,
-        });
+        predictions.set(
+            bob.clone(),
+            PrecisionPrediction {
+                user: bob.clone(),
+                predicted_price: 2200,
+                amount: 100_0000000,
+            },
+        );
 
         env.storage()
             .persistent()
@@ -655,26 +677,35 @@ fn test_resolve_precision_three_way_tie() {
     client.mint_initial(&charlie);
 
     env.as_contract(&contract_id, || {
-        let mut predictions = Vec::<PrecisionPrediction>::new(&env);
+        let mut predictions = Map::<Address, PrecisionPrediction>::new(&env);
 
         // All three tie with diff of 10
-        predictions.push_back(PrecisionPrediction {
-            user: alice.clone(),
-            predicted_price: 2190,
-            amount: 100_0000000,
-        });
+        predictions.set(
+            alice.clone(),
+            PrecisionPrediction {
+                user: alice.clone(),
+                predicted_price: 2190,
+                amount: 100_0000000,
+            },
+        );
 
-        predictions.push_back(PrecisionPrediction {
-            user: bob.clone(),
-            predicted_price: 2210,
-            amount: 150_0000000,
-        });
+        predictions.set(
+            bob.clone(),
+            PrecisionPrediction {
+                user: bob.clone(),
+                predicted_price: 2210,
+                amount: 150_0000000,
+            },
+        );
 
-        predictions.push_back(PrecisionPrediction {
-            user: charlie.clone(),
-            predicted_price: 2210,
-            amount: 150_0000000,
-        });
+        predictions.set(
+            charlie.clone(),
+            PrecisionPrediction {
+                user: charlie.clone(),
+                predicted_price: 2210,
+                amount: 150_0000000,
+            },
+        );
 
         env.storage()
             .persistent()
@@ -717,13 +748,16 @@ fn test_resolve_precision_single_prediction() {
     client.mint_initial(&alice);
 
     env.as_contract(&contract_id, || {
-        let mut predictions = Vec::<PrecisionPrediction>::new(&env);
+        let mut predictions = Map::<Address, PrecisionPrediction>::new(&env);
 
-        predictions.push_back(PrecisionPrediction {
-            user: alice.clone(),
-            predicted_price: 2300,
-            amount: 100_0000000,
-        });
+        predictions.set(
+            alice.clone(),
+            PrecisionPrediction {
+                user: alice.clone(),
+                predicted_price: 2300,
+                amount: 100_0000000,
+            },
+        );
 
         env.storage()
             .persistent()
@@ -765,20 +799,26 @@ fn test_resolve_precision_large_differences() {
     client.mint_initial(&bob);
 
     env.as_contract(&contract_id, || {
-        let mut predictions = Vec::<PrecisionPrediction>::new(&env);
+        let mut predictions = Map::<Address, PrecisionPrediction>::new(&env);
 
         // Very large price predictions
-        predictions.push_back(PrecisionPrediction {
-            user: alice.clone(),
-            predicted_price: 1_0000,
-            amount: 100_0000000,
-        });
+        predictions.set(
+            alice.clone(),
+            PrecisionPrediction {
+                user: alice.clone(),
+                predicted_price: 1_0000,
+                amount: 100_0000000,
+            },
+        );
 
-        predictions.push_back(PrecisionPrediction {
-            user: bob.clone(),
-            predicted_price: 9_9999,
-            amount: 100_0000000,
-        });
+        predictions.set(
+            bob.clone(),
+            PrecisionPrediction {
+                user: bob.clone(),
+                predicted_price: 9_9999,
+                amount: 100_0000000,
+            },
+        );
 
         env.storage()
             .persistent()

@@ -159,33 +159,44 @@ proptest! {
         let charlie = Address::generate(&env);
 
         env.as_contract(&contract_id, || {
-            let mut predictions = Vec::<PrecisionPrediction>::new(&env);
+            let mut predictions = Map::<Address, PrecisionPrediction>::new(&env);
 
             if amount_a > 0 {
-                predictions.push_back(PrecisionPrediction {
-                    user: alice.clone(),
-                    predicted_price: price_a,
-                    amount: amount_a,
-                });
+                predictions.set(
+                    alice.clone(),
+                    PrecisionPrediction {
+                        user: alice.clone(),
+                        predicted_price: price_a,
+                        amount: amount_a,
+                    },
+                );
             }
 
             if amount_b > 0 {
-                predictions.push_back(PrecisionPrediction {
-                    user: bob.clone(),
-                    predicted_price: price_b,
-                    amount: amount_b,
-                });
+                predictions.set(
+                    bob.clone(),
+                    PrecisionPrediction {
+                        user: bob.clone(),
+                        predicted_price: price_b,
+                        amount: amount_b,
+                    },
+                );
             }
 
             if amount_c > 0 {
-                predictions.push_back(PrecisionPrediction {
-                    user: charlie.clone(),
-                    predicted_price: price_c,
-                    amount: amount_c,
-                });
+                predictions.set(
+                    charlie.clone(),
+                    PrecisionPrediction {
+                        user: charlie.clone(),
+                        predicted_price: price_c,
+                        amount: amount_c,
+                    },
+                );
             }
 
-            env.storage().persistent().set(&DataKey::PrecisionPositions, &predictions);
+            env.storage()
+                .persistent()
+                .set(&DataKey::PrecisionPositions, &predictions);
         });
 
         // Advance ledger to allow resolution

@@ -4,14 +4,16 @@ on:
   push:
     branches: [main, develop]
   pull_request:
-    branches: [main, develop]
+    branches: ["**"]
 
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
 
+permissions:
+  contents: read
+
 jobs:
-  # Job 1: Rust contract tests
   rust-test:
     name: Rust Tests
     runs-on: ubuntu-latest
@@ -22,7 +24,6 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.92.0
           components: clippy
           targets: wasm32-unknown-unknown
 
@@ -45,7 +46,6 @@ jobs:
       - name: Run cargo clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
 
-  # Job 2: Contract build
   contract-build:
     name: Contract Build
     runs-on: ubuntu-latest
@@ -56,7 +56,6 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.92.0
           targets: wasm32-unknown-unknown
 
       - name: Cache Rust dependencies
@@ -91,7 +90,6 @@ jobs:
           path: target/wasm32-unknown-unknown/release/hello_world.wasm
           retention-days: 7
 
-  # Job 3: TypeScript bindings build
   bindings-build:
     name: Bindings Build
     runs-on: ubuntu-latest
@@ -103,8 +101,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'npm'
+          node-version: "20"
+          cache: npm
           cache-dependency-path: '**/package-lock.json'
 
       - name: Install dependencies
@@ -121,8 +119,8 @@ jobs:
             echo "Error: Build artifacts not found"
             exit 1
           fi
-          echo "✓ index.js exists"
-          echo "✓ index.d.ts exists"
+          echo "index.js exists"
+          echo "index.d.ts exists"
 
       - name: Upload bindings artifact
         uses: actions/upload-artifact@v4
@@ -131,7 +129,6 @@ jobs:
           path: bindings/dist/
           retention-days: 7
 
-  # Job 4: Parity checks (contract + bindings integration)
   parity-check:
     name: Parity Check
     runs-on: ubuntu-latest
@@ -152,43 +149,31 @@ jobs:
           name: bindings-dist
           path: bindings/dist/
 
-      - name: Install Stellar CLI
-        run: |
-          curl -L https://github.com/stellar/stellar-cli/releases/download/v22.0.1/stellar-cli-22.0.1-x86_64-unknown-linux-gnu.tar.gz | tar xz
-          sudo mv stellar /usr/local/bin/
-          stellar --version
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-
       - name: Verify WASM and bindings compatibility
         run: |
           echo "Checking WASM file..."
           ls -lh target/wasm32-unknown-unknown/release/hello_world.wasm
-          
+
           echo "Checking bindings..."
           ls -lh bindings/dist/
-          
+
           echo "Verifying TypeScript types exist..."
           if grep -q "export.*Client" bindings/dist/index.d.ts; then
-            echo "✓ Client export found in type definitions"
+            echo "Client export found in type definitions"
           else
-            echo "✗ Client export not found"
+            echo "Client export not found"
             exit 1
           fi
-          
-          if grep -q "export.*BetSide" bindings/dist/index.d.ts; then
-            echo "✓ BetSide export found in type definitions"
-          else
-            echo "✗ BetSide export not found"
-            exit 1
-          fi
-          
-          echo "✓ Parity check passed: Contract and bindings are compatible"
 
-  # Job 5: Format check
+          if grep -q "export.*BetSide" bindings/dist/index.d.ts; then
+            echo "BetSide export found in type definitions"
+          else
+            echo "BetSide export not found"
+            exit 1
+          fi
+
+          echo "Parity check passed: Contract and bindings are compatible"
+
   format-check:
     name: Format Check
     runs-on: ubuntu-latest
@@ -199,13 +184,11 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.92.0
           components: rustfmt
 
       - name: Check Rust formatting
         run: cargo fmt --all -- --check
 
-  # Summary job - requires all checks to pass
   ci-success:
     name: CI Success
     runs-on: ubuntu-latest
@@ -219,7 +202,7 @@ jobs:
              [ "${{ needs.bindings-build.result }}" != "success" ] || \
              [ "${{ needs.parity-check.result }}" != "success" ] || \
              [ "${{ needs.format-check.result }}" != "success" ]; then
-            echo "❌ One or more CI jobs failed"
+            echo "One or more CI jobs failed"
             echo "Rust Tests: ${{ needs.rust-test.result }}"
             echo "Contract Build: ${{ needs.contract-build.result }}"
             echo "Bindings Build: ${{ needs.bindings-build.result }}"
@@ -227,4 +210,4 @@ jobs:
             echo "Format Check: ${{ needs.format-check.result }}"
             exit 1
           fi
-          echo "✅ All CI checks passed!"
+          echo "All CI checks passed"

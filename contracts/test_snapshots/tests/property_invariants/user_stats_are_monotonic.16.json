@@ -76,7 +76,7 @@
                         "symbol": "total_losses"
                       },
                       "val": {
-                        "u32": 7
+                        "u32": 11
                       }
                     },
                     {
@@ -84,7 +84,7 @@
                         "symbol": "total_wins"
                       },
                       "val": {
-                        "u32": 7
+                        "u32": 9
                       }
                     }
                   ]
