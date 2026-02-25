@@ -48,29 +48,68 @@
         }
       ]
     ],
-    [],
-    [
+    []
+  ],
+  "ledger": {
+    "protocol_version": 23,
+    "sequence_number": 12,
+    "timestamp": 1000,
+    "network_id": "0000000000000000000000000000000000000000000000000000000000000000",
+    "base_reserve": 0,
+    "min_persistent_entry_ttl": 4096,
+    "min_temp_entry_ttl": 16,
+    "max_entry_ttl": 6312000,
+    "ledger_entries": [
       [
-        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
         {
-          "function": {
-            "contract_fn": {
-              "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-              "function_name": "resolve_round",
-              "args": [
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            "key": {
+              "vec": [
                 {
+                  "symbol": "ActiveRound"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "ActiveRound"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
                   "map": [
                     {
                       "key": {
-                        "symbol": "price"
+                        "symbol": "bet_end_ledger"
                       },
                       "val": {
-                        "u128": "15000000"
+                        "u32": 6
                       }
                     },
                     {
                       "key": {
-                        "symbol": "round_id"
+                        "symbol": "end_ledger"
+                      },
+                      "val": {
+                        "u32": 12
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "mode"
                       },
                       "val": {
                         "u32": 0
@@ -78,33 +117,45 @@
                     },
                     {
                       "key": {
-                        "symbol": "timestamp"
+                        "symbol": "pool_down"
                       },
                       "val": {
-                        "u64": "0"
+                        "i128": "0"
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "pool_up"
+                      },
+                      "val": {
+                        "i128": "0"
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "price_start"
+                      },
+                      "val": {
+                        "u128": "10000000"
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "start_ledger"
+                      },
+                      "val": {
+                        "u32": 0
                       }
                     }
                   ]
                 }
-              ]
-            }
+              }
+            },
+            "ext": "v0"
           },
-          "sub_invocations": []
-        }
-      ]
-    ],
-    []
-  ],
-  "ledger": {
-    "protocol_version": 23,
-    "sequence_number": 12,
-    "timestamp": 0,
-    "network_id": "0000000000000000000000000000000000000000000000000000000000000000",
-    "base_reserve": 0,
-    "min_persistent_entry_ttl": 4096,
-    "min_temp_entry_ttl": 16,
-    "max_entry_ttl": 6312000,
-    "ledger_entries": [
+          4095
+        ]
+      ],
       [
         {
           "contract_data": {
@@ -357,39 +408,6 @@
             "ext": "v0"
           },
           6311999
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
-            "key": {
-              "ledger_key_nonce": {
-                "nonce": "1033654523790656264"
-              }
-            },
-            "durability": "temporary"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
-                "key": {
-                  "ledger_key_nonce": {
-                    "nonce": "1033654523790656264"
-                  }
-                },
-                "durability": "temporary",
-                "val": "void"
-              }
-            },
-            "ext": "v0"
-          },
-          6312011
         ]
       ],
       [

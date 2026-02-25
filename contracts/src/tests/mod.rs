@@ -6,4 +6,5 @@ mod initialization;
 mod lifecycle;
 mod mode_tests;
 mod resolution;
+mod security;
 mod windows;
