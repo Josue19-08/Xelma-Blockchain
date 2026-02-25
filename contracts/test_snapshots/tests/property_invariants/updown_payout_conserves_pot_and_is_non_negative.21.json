@@ -59,7 +59,32 @@
               "function_name": "resolve_round",
               "args": [
                 {
-                  "u128": "20000000"
+                  "map": [
+                    {
+                      "key": {
+                        "symbol": "price"
+                      },
+                      "val": {
+                        "u128": "20000000"
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "round_id"
+                      },
+                      "val": {
+                        "u32": 0
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "timestamp"
+                      },
+                      "val": {
+                        "u64": "0"
+                      }
+                    }
+                  ]
                 }
               ]
             }
@@ -235,7 +260,7 @@
                 },
                 "durability": "persistent",
                 "val": {
-                  "i128": "643359707"
+                  "i128": "1523089920"
                 }
               }
             },
@@ -280,7 +305,7 @@
                 },
                 "durability": "persistent",
                 "val": {
-                  "i128": "151965370"
+                  "i128": "144893637"
                 }
               }
             },

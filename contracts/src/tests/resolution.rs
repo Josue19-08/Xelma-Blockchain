@@ -2,7 +2,9 @@
 
 use crate::contract::{VirtualTokenContract, VirtualTokenContractClient};
 use crate::errors::ContractError;
-use crate::types::{BetSide, DataKey, PrecisionPrediction, Round, UserPosition};
+use crate::types::{
+    BetSide, DataKey, OraclePayload, PrecisionPrediction, Round, UserPosition,
+};
 use soroban_sdk::{
     testutils::{Address as _, Ledger as _},
     Address, Env, Map, Vec,
@@ -77,7 +79,11 @@ fn test_resolve_round_price_unchanged() {
         li.sequence_number = 12;
     });
     // Resolve with SAME price (unchanged)
-    client.resolve_round(&start_price);
+    client.resolve_round(&OraclePayload {
+        price: start_price,
+        timestamp: env.ledger().timestamp(),
+        round_id: 0,
+    });
 
     // Check pending winnings (not claimed yet)
     assert_eq!(client.get_pending_winnings(&user1), 100_0000000);
@@ -174,7 +180,11 @@ fn test_resolve_round_price_went_up() {
         li.sequence_number = 12;
     });
     // Resolve with HIGHER price (1.5 XLM - price went UP)
-    client.resolve_round(&1_5000000);
+    client.resolve_round(&OraclePayload {
+        price: 1_5000000,
+        timestamp: env.ledger().timestamp(),
+        round_id: 0,
+    });
 
     // Check pending winnings
     assert_eq!(client.get_pending_winnings(&alice), 150_0000000);
@@ -263,7 +273,11 @@ fn test_resolve_round_price_went_down() {
         li.sequence_number = 12;
     });
     // Resolve with LOWER price (1.0 XLM - price went DOWN)
-    client.resolve_round(&1_0000000);
+    client.resolve_round(&OraclePayload {
+        price: 1_0000000,
+        timestamp: env.ledger().timestamp(),
+        round_id: 0,
+    });
 
     // Check pending winnings
     assert_eq!(client.get_pending_winnings(&alice), 300_0000000);
@@ -355,7 +369,11 @@ fn test_resolve_round_without_active_round() {
     client.initialize(&admin, &oracle);
 
     // Try to resolve without creating a round - should return error
-    let result = client.try_resolve_round(&1_0000000);
+    let result = client.try_resolve_round(&OraclePayload {
+        price: 1_0000000,
+        timestamp: env.ledger().timestamp(),
+        round_id: 0,
+    });
     assert_eq!(result, Err(Ok(ContractError::NoActiveRound)));
 }
 
@@ -422,7 +440,11 @@ fn test_resolve_precision_closest_guess_wins() {
     });
 
     // Resolve with actual price 2298
-    client.resolve_round(&2298);
+    client.resolve_round(&OraclePayload {
+        price: 2298,
+        timestamp: env.ledger().timestamp(),
+        round_id: 0,
+    });
 
     // Alice should win the entire pot (100 + 150 + 50 = 300)
     assert_eq!(client.get_pending_winnings(&alice), 300_0000000);
@@ -501,7 +523,11 @@ fn test_resolve_precision_tie_splits_pot() {
     });
 
     // Resolve with actual price 2200
-    client.resolve_round(&2200);
+    client.resolve_round(&OraclePayload {
+        price: 2200,
+        timestamp: env.ledger().timestamp(),
+        round_id: 0,
+    });
 
     // Total pot is 300, split evenly between Alice and Bob (150 each)
     assert_eq!(client.get_pending_winnings(&alice), 150_0000000);
@@ -566,7 +592,11 @@ fn test_resolve_precision_exact_match() {
     });
 
     // Alice guessed exactly right
-    client.resolve_round(&2250);
+    client.resolve_round(&OraclePayload {
+        price: 2250,
+        timestamp: env.ledger().timestamp(),
+        round_id: 0,
+    });
 
     assert_eq!(client.get_pending_winnings(&alice), 200_0000000); // Wins entire pot
     assert_eq!(client.get_pending_winnings(&bob), 0);
@@ -592,7 +622,11 @@ fn test_resolve_precision_no_predictions() {
     });
 
     // Resolve with no predictions - should succeed without errors
-    client.resolve_round(&2250);
+    client.resolve_round(&OraclePayload {
+        price: 2250,
+        timestamp: env.ledger().timestamp(),
+        round_id: 0,
+    });
 
     // Round should be cleared
     assert_eq!(client.get_active_round(), None);
@@ -652,7 +686,11 @@ fn test_resolve_precision_three_way_tie() {
     });
 
     // Actual price 2200 - Alice diff 10, Bob diff 10, Charlie diff 10
-    client.resolve_round(&2200);
+    client.resolve_round(&OraclePayload {
+        price: 2200,
+        timestamp: env.ledger().timestamp(),
+        round_id: 0,
+    });
 
     // Total pot is 400, split 3 ways = 133 each (integer division)
     let pot_per_winner = 400_0000000 / 3;
@@ -697,7 +735,11 @@ fn test_resolve_precision_single_prediction() {
     });
 
     // Single prediction always wins
-    client.resolve_round(&2500);
+    client.resolve_round(&OraclePayload {
+        price: 2500,
+        timestamp: env.ledger().timestamp(),
+        round_id: 0,
+    });
 
     assert_eq!(client.get_pending_winnings(&alice), 100_0000000);
 }
@@ -748,7 +790,11 @@ fn test_resolve_precision_large_differences() {
     });
 
     // Actual price is 1_0001 - Alice is closest (diff 1 vs Bob's diff 8_9998)
-    client.resolve_round(&1_0001);
+    client.resolve_round(&OraclePayload {
+        price: 1_0001,
+        timestamp: env.ledger().timestamp(),
+        round_id: 0,
+    });
 
     assert_eq!(client.get_pending_winnings(&alice), 200_0000000);
     assert_eq!(client.get_pending_winnings(&bob), 0);

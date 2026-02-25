@@ -4,7 +4,8 @@ use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Map, Vec};
 
 use crate::errors::ContractError;
 use crate::types::{
-    BetSide, DataKey, PrecisionPrediction, Round, RoundMode, UserPosition, UserStats,
+    BetSide, DataKey, OraclePayload, PrecisionPrediction, Round, RoundMode, UserPosition,
+    UserStats,
 };
 
 #[contract]
@@ -418,11 +419,11 @@ impl VirtualTokenContract {
             .unwrap_or(Map::new(&env))
     }
 
-    /// Resolves the round with final price (oracle only)
+    /// Resolves the round with oracle payload (oracle only)
     /// Mode 0 (Up/Down): Winners split losers' pool proportionally; ties get refunds
     /// Mode 1 (Precision/Legends): Closest guess wins full pot; ties split evenly
-    pub fn resolve_round(env: Env, final_price: u128) -> Result<(), ContractError> {
-        if final_price == 0 {
+    pub fn resolve_round(env: Env, payload: OraclePayload) -> Result<(), ContractError> {
+        if payload.price == 0 {
             return Err(ContractError::InvalidPrice);
         }
 
@@ -440,6 +441,17 @@ impl VirtualTokenContract {
             .get(&DataKey::ActiveRound)
             .ok_or(ContractError::NoActiveRound)?;
 
+        // Verify round ID matches to prevent cross-round replays
+        if payload.round_id != round.start_ledger {
+            return Err(ContractError::InvalidOracleRound);
+        }
+
+        // Verify data freshness (max 300 seconds / 5 minutes old)
+        let current_time = env.ledger().timestamp();
+        if current_time > payload.timestamp + 300 {
+            return Err(ContractError::StaleOracleData);
+        }
+
         // Verify round has reached end_ledger
         let current_ledger = env.ledger().sequence();
         if current_ledger < round.end_ledger {
@@ -449,10 +461,10 @@ impl VirtualTokenContract {
         // Branch based on round mode
         match round.mode {
             RoundMode::UpDown => {
-                Self::_resolve_updown_mode(&env, &round, final_price)?;
+                Self::_resolve_updown_mode(&env, &round, payload.price)?;
             }
             RoundMode::Precision => {
-                Self::_resolve_precision_mode(&env, final_price)?;
+                Self::_resolve_precision_mode(&env, payload.price)?;
             }
         }
 
@@ -468,7 +480,7 @@ impl VirtualTokenContract {
         #[allow(deprecated)]
         env.events().publish(
             (symbol_short!("round"), symbol_short!("resolved")),
-            final_price,
+            payload.price,
         );
 
         Ok(())

@@ -6,7 +6,9 @@
 //! - Monotonic user statistics (wins, losses, and best streak never decrease)
 
 use crate::contract::{VirtualTokenContract, VirtualTokenContractClient};
-use crate::types::{BetSide, DataKey, PrecisionPrediction, Round, UserPosition, UserStats};
+use crate::types::{
+    BetSide, DataKey, OraclePayload, PrecisionPrediction, Round, UserPosition, UserStats,
+};
 use proptest::prelude::*;
 use soroban_sdk::{
     testutils::{Address as _, Ledger as _},
@@ -90,7 +92,11 @@ proptest! {
         });
 
         // Force "price went up" scenario
-        client.resolve_round(&2_0000000);
+        client.resolve_round(&OraclePayload {
+            price: 2_0000000,
+            timestamp: env.ledger().timestamp(),
+            round_id: 0,
+        });
 
         let alice_pending = client.get_pending_winnings(&alice);
         let bob_pending = client.get_pending_winnings(&bob);
@@ -187,7 +193,11 @@ proptest! {
             li.sequence_number = 12;
         });
 
-        client.resolve_round(&final_price);
+        client.resolve_round(&OraclePayload {
+            price: final_price,
+            timestamp: env.ledger().timestamp(),
+            round_id: 0,
+        });
 
         let alice_pending = client.get_pending_winnings(&alice);
         let bob_pending = client.get_pending_winnings(&bob);

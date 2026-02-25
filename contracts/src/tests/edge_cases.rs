@@ -1,7 +1,7 @@
 //! Tests for boundary conditions and unusual scenarios.
 
 use crate::contract::{VirtualTokenContract, VirtualTokenContractClient};
-use crate::types::{BetSide, DataKey, Round, UserPosition};
+use crate::types::{BetSide, DataKey, OraclePayload, Round, UserPosition};
 use soroban_sdk::{
     testutils::{Address as _, Ledger as _},
     Address, Env, Map,
@@ -32,7 +32,11 @@ fn test_round_with_no_participants() {
         li.sequence_number = 12;
     });
     // Resolve with no participants
-    client.resolve_round(&1_5000000);
+    client.resolve_round(&OraclePayload {
+        price: 1_5000000,
+        timestamp: env.ledger().timestamp(),
+        round_id: 0,
+    });
 
     // Should clear round without errors
     assert_eq!(client.get_active_round(), None);
@@ -69,7 +73,11 @@ fn test_round_with_only_one_side() {
         li.sequence_number = 12;
     });
     // Resolve - UP wins but no losers to take from
-    client.resolve_round(&1_5000000);
+    client.resolve_round(&OraclePayload {
+        price: 1_5000000,
+        timestamp: env.ledger().timestamp(),
+        round_id: 0,
+    });
 
     // Winners should only get their bets back (no losing pool to split)
     assert_eq!(client.get_pending_winnings(&alice), 100_0000000);
@@ -124,7 +132,12 @@ fn test_accumulate_pending_winnings() {
     env.ledger().with_mut(|li| {
         li.sequence_number = 12;
     });
-    client.resolve_round(&1_5000000); // UP wins
+    let round1 = client.get_active_round().unwrap();
+    client.resolve_round(&OraclePayload {
+        price: 1_5000000, // UP wins
+        timestamp: env.ledger().timestamp(),
+        round_id: round1.start_ledger,
+    });
 
     let first_pending = client.get_pending_winnings(&alice);
     assert!(first_pending > 0);
@@ -137,7 +150,12 @@ fn test_accumulate_pending_winnings() {
     env.ledger().with_mut(|li| {
         li.sequence_number = 24; // 12 + 12 for second round
     });
-    client.resolve_round(&2_0000000); // Price unchanged - refund
+    let round2 = client.get_active_round().unwrap();
+    client.resolve_round(&OraclePayload {
+        price: 2_0000000, // Price unchanged - refund
+        timestamp: env.ledger().timestamp(),
+        round_id: round2.start_ledger,
+    });
 
     // Should have accumulated pending from both rounds
     let total_pending = client.get_pending_winnings(&alice);

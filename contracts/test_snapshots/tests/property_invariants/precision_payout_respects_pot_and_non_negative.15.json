@@ -61,7 +61,32 @@
               "function_name": "resolve_round",
               "args": [
                 {
-                  "u128": "82138391"
+                  "map": [
+                    {
+                      "key": {
+                        "symbol": "price"
+                      },
+                      "val": {
+                        "u128": "74941604"
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "round_id"
+                      },
+                      "val": {
+                        "u32": 0
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "timestamp"
+                      },
+                      "val": {
+                        "u64": "0"
+                      }
+                    }
+                  ]
                 }
               ]
             }
@@ -237,7 +262,7 @@
                 },
                 "durability": "persistent",
                 "val": {
-                  "i128": "2385115994"
+                  "i128": "2125692792"
                 }
               }
             },

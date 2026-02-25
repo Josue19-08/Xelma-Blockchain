@@ -2,7 +2,7 @@
 
 use crate::contract::{VirtualTokenContract, VirtualTokenContractClient};
 use crate::errors::ContractError;
-use crate::types::{BetSide, DataKey, Round, UserPosition};
+use crate::types::{BetSide, DataKey, OraclePayload, Round, UserPosition};
 use soroban_sdk::{
     testutils::{Address as _, Ledger as _},
     Address, Env, Map,
@@ -125,7 +125,11 @@ fn test_full_round_lifecycle() {
         li.sequence_number = 12; // Default run window is 12
     });
     let final_price: u128 = 1_5000000; // 1.5 XLM
-    client.resolve_round(&final_price);
+    client.resolve_round(&OraclePayload {
+        price: final_price,
+        timestamp: env.ledger().timestamp(),
+        round_id: 0,
+    });
 
     // Round should be cleared
     assert_eq!(client.get_active_round(), None);
@@ -212,7 +216,12 @@ fn test_multiple_rounds_lifecycle() {
     env.ledger().with_mut(|li| {
         li.sequence_number = 12;
     });
-    client.resolve_round(&1_5000000); // UP wins
+    let round1 = client.get_active_round().unwrap();
+    client.resolve_round(&OraclePayload {
+        price: 1_5000000, // UP wins
+        timestamp: env.ledger().timestamp(),
+        round_id: round1.start_ledger,
+    });
     client.claim_winnings(&alice);
 
     let stats = client.get_user_stats(&alice);
@@ -252,7 +261,12 @@ fn test_multiple_rounds_lifecycle() {
     env.ledger().with_mut(|li| {
         li.sequence_number = 24; // 12 + 12 for second round
     });
-    client.resolve_round(&1_5000000); // DOWN wins
+    let round2 = client.get_active_round().unwrap();
+    client.resolve_round(&OraclePayload {
+        price: 1_5000000, // DOWN wins
+        timestamp: env.ledger().timestamp(),
+        round_id: round2.start_ledger,
+    });
 
     let stats = client.get_user_stats(&alice);
     assert_eq!(stats.total_wins, 2);

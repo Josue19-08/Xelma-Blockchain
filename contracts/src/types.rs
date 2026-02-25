@@ -63,6 +63,15 @@ pub struct PrecisionPrediction {
 
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
+pub struct OraclePayload {
+    pub price: u128,
+    pub timestamp: u64,
+    /// Round identifier that should match `Round.start_ledger`
+    pub round_id: u32,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Round {
     pub price_start: u128,   // Starting XLM price in stroops
     pub start_ledger: u32,   // Ledger when round was created
