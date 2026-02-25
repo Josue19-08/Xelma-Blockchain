@@ -28,6 +28,7 @@
     "README.md"
   ],
   "scripts": {
+    "lint": "tsc --noEmit",
     "build": "tsc"
   },
   "dependencies": {

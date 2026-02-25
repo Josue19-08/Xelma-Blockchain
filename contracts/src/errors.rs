@@ -44,4 +44,3 @@ pub enum ContractError {
     /// An active round already exists and cannot be overwritten
     RoundAlreadyActive = 18,
 }
-

@@ -3,7 +3,10 @@
 use crate::contract::{VirtualTokenContract, VirtualTokenContractClient};
 use crate::errors::ContractError;
 use crate::types::{BetSide, RoundMode};
-use soroban_sdk::{testutils::{Address as _, Ledger as _, Events}, Address, Env};
+use soroban_sdk::{
+    testutils::{Address as _, Events, Ledger as _},
+    Address, Env,
+};
 
 #[test]
 fn test_create_round_default_mode() {
@@ -438,6 +441,7 @@ fn test_predict_price_valid_scales() {
         }
 
         // Create new Precision round for each test case
+
         client.create_round(&1_0000000, &Some(1));
 
         // Should succeed with valid price scale
@@ -445,6 +449,13 @@ fn test_predict_price_valid_scales() {
 
         let prediction = client.get_user_precision_prediction(&user).unwrap();
         assert_eq!(prediction.predicted_price, *price);
+
+
+        // Clean up for next iteration
+        env.ledger().with_mut(|li| {
+            li.sequence_number += 20;
+        });
+
     }
 }
 
@@ -498,8 +509,7 @@ fn test_predict_price_event_emission() {
 
     // Verify event was emitted
     let events = env.events().all();
-    
-    // Should have events (at least the prediction event)
-    assert!(events.len() > 0);
-}
 
+    // Should have events (at least the prediction event)
+    assert!(!events.is_empty());
+}

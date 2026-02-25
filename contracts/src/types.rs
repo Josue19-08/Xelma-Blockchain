@@ -7,8 +7,8 @@ use soroban_sdk::{contracttype, Address};
 #[derive(Clone, Debug, PartialEq)]
 #[repr(u32)]
 pub enum RoundMode {
-    UpDown = 0,     // Simple up/down predictions
-    Precision = 1,  // Exact price predictions (Legends mode)
+    UpDown = 0,    // Simple up/down predictions
+    Precision = 1, // Exact price predictions (Legends mode)
 }
 
 /// Storage keys for contract data
@@ -20,12 +20,12 @@ pub enum DataKey {
     Oracle,
     ActiveRound,
     Positions,
-    UpDownPositions,      // Map<Address, i128> for Up/Down mode
-    PrecisionPositions,   // Vec<PrecisionPrediction> for Precision mode
+    UpDownPositions,    // Map<Address, i128> for Up/Down mode
+    PrecisionPositions, // Vec<PrecisionPrediction> for Precision mode
     PendingWinnings(Address),
     UserStats(Address),
-    BetWindowLedgers,     // Bet window duration in ledgers
-    RunWindowLedgers,     // Run window duration in ledgers
+    BetWindowLedgers, // Bet window duration in ledgers
+    RunWindowLedgers, // Run window duration in ledgers
 }
 
 /// Represents which side a user bet on
@@ -57,8 +57,8 @@ pub struct UserStats {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PrecisionPrediction {
     pub user: Address,
-    pub predicted_price: u128,  // Price scaled to 4 decimals (e.g., 0.2297 → 2297)
-    pub amount: i128,           // Bet amount
+    pub predicted_price: u128, // Price scaled to 4 decimals (e.g., 0.2297 → 2297)
+    pub amount: i128,          // Bet amount
 }
 
 #[contracttype]
@@ -72,4 +72,3 @@ pub struct Round {
     pub pool_down: i128,     // Total vXLM bet on DOWN
     pub mode: RoundMode,     // Round mode: UpDown (0) or Precision (1)
 }
-
