@@ -85,14 +85,17 @@ impl VirtualTokenContract {
             .unwrap_or(12);
 
         // Generate unique round ID
-        let last_round_id: u64 = env.storage()
+        let last_round_id: u64 = env
+            .storage()
             .persistent()
             .get(&DataKey::LastRoundId)
             .unwrap_or(0);
         let round_id = last_round_id
             .checked_add(1)
             .ok_or(ContractError::Overflow)?;
-        env.storage().persistent().set(&DataKey::LastRoundId, &round_id);
+        env.storage()
+            .persistent()
+            .set(&DataKey::LastRoundId, &round_id);
 
         let start_ledger = env.ledger().sequence();
         let bet_end_ledger = start_ledger
@@ -127,7 +130,13 @@ impl VirtualTokenContract {
         #[allow(deprecated)]
         env.events().publish(
             (symbol_short!("round"), symbol_short!("created")),
-            (round_id, start_price, bet_end_ledger, end_ledger, mode_value),
+            (
+                round_id,
+                start_price,
+                bet_end_ledger,
+                end_ledger,
+                mode_value,
+            ),
         );
 
         Ok(())
