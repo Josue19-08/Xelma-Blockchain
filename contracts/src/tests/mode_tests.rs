@@ -513,6 +513,6 @@ fn test_predict_price_event_emission() {
     let events = env.events().all();
 
     // Should have events (at least the prediction event)
-    assert!(events.len() > 0);
+    assert!(!events.is_empty());
     assert!(!events.is_empty());
 }
