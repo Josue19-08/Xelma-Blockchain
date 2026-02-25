@@ -725,11 +725,14 @@ fn test_resolve_precision_three_way_tie() {
 
     // Total pot is 400, split 3 ways = 133.33... each
     // With remainder policy: Alice gets 133 + 1 (remainder), Bob and Charlie get 133
-    let pot_per_winner = 400_0000000 / 3;  // 133_3333333
-    let remainder = 400_0000000 % 3;        // 1
-    assert_eq!(client.get_pending_winnings(&alice), pot_per_winner + remainder);  // 133_3333334
-    assert_eq!(client.get_pending_winnings(&bob), pot_per_winner);                // 133_3333333
-    assert_eq!(client.get_pending_winnings(&charlie), pot_per_winner);            // 133_3333333
+    let pot_per_winner = 400_0000000 / 3; // 133_3333333
+    let remainder = 400_0000000 % 3; // 1
+    assert_eq!(
+        client.get_pending_winnings(&alice),
+        pot_per_winner + remainder
+    ); // 133_3333334
+    assert_eq!(client.get_pending_winnings(&bob), pot_per_winner); // 133_3333333
+    assert_eq!(client.get_pending_winnings(&charlie), pot_per_winner); // 133_3333333
 }
 
 #[test]
@@ -896,7 +899,9 @@ fn test_precision_remainder_3way_tie_uneven_pot() {
             },
         );
 
-        env.storage().persistent().set(&DataKey::PrecisionPositions, &predictions);
+        env.storage()
+            .persistent()
+            .set(&DataKey::PrecisionPositions, &predictions);
     });
 
     env.ledger().with_mut(|li| {
@@ -918,9 +923,12 @@ fn test_precision_remainder_3way_tie_uneven_pot() {
     // Charlie: 33_3333333
     let pot_per_winner = 100_0000000 / 3;
     let remainder = 100_0000000 % 3;
-    assert_eq!(client.get_pending_winnings(&alice), pot_per_winner + remainder);  // 33_3333334
-    assert_eq!(client.get_pending_winnings(&bob), pot_per_winner);                // 33_3333333
-    assert_eq!(client.get_pending_winnings(&charlie), pot_per_winner);            // 33_3333333
+    assert_eq!(
+        client.get_pending_winnings(&alice),
+        pot_per_winner + remainder
+    ); // 33_3333334
+    assert_eq!(client.get_pending_winnings(&bob), pot_per_winner); // 33_3333333
+    assert_eq!(client.get_pending_winnings(&charlie), pot_per_winner); // 33_3333333
 
     // Verify full pot accounting: 33_3333334 + 33_3333333 + 33_3333333 = 100_0000000 ✓
 }
@@ -1001,7 +1009,9 @@ fn test_precision_remainder_5way_tie() {
             },
         );
 
-        env.storage().persistent().set(&DataKey::PrecisionPositions, &predictions);
+        env.storage()
+            .persistent()
+            .set(&DataKey::PrecisionPositions, &predictions);
     });
 
     env.ledger().with_mut(|li| {
@@ -1022,11 +1032,14 @@ fn test_precision_remainder_5way_tie() {
     // Others: 20_6000000 each
     let pot_per_winner = 103_0000000 / 5;
     let remainder = 103_0000000 % 5;
-    assert_eq!(client.get_pending_winnings(&user1), pot_per_winner + remainder);  // 23_6000000
-    assert_eq!(client.get_pending_winnings(&user2), pot_per_winner);              // 20_6000000
-    assert_eq!(client.get_pending_winnings(&user3), pot_per_winner);              // 20_6000000
-    assert_eq!(client.get_pending_winnings(&user4), pot_per_winner);              // 20_6000000
-    assert_eq!(client.get_pending_winnings(&user5), pot_per_winner);              // 20_6000000
+    assert_eq!(
+        client.get_pending_winnings(&user1),
+        pot_per_winner + remainder
+    ); // 23_6000000
+    assert_eq!(client.get_pending_winnings(&user2), pot_per_winner); // 20_6000000
+    assert_eq!(client.get_pending_winnings(&user3), pot_per_winner); // 20_6000000
+    assert_eq!(client.get_pending_winnings(&user4), pot_per_winner); // 20_6000000
+    assert_eq!(client.get_pending_winnings(&user5), pot_per_winner); // 20_6000000
 
     // Verify full pot accounting: 23_6000000 + 20_6000000*4 = 103_0000000 ✓
 }
@@ -1073,7 +1086,9 @@ fn test_precision_no_remainder() {
             },
         );
 
-        env.storage().persistent().set(&DataKey::PrecisionPositions, &predictions);
+        env.storage()
+            .persistent()
+            .set(&DataKey::PrecisionPositions, &predictions);
     });
 
     env.ledger().with_mut(|li| {
