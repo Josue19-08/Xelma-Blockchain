@@ -12,7 +12,7 @@ use crate::types::{
 use proptest::prelude::*;
 use soroban_sdk::{
     testutils::{Address as _, Ledger as _},
-    Address, Env, Map, Vec,
+    Address, Env, Map,
 };
 
 proptest! {

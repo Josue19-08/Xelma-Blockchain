@@ -5,7 +5,7 @@ use crate::errors::ContractError;
 use crate::types::{BetSide, DataKey, OraclePayload, PrecisionPrediction, Round, UserPosition};
 use soroban_sdk::{
     testutils::{Address as _, Ledger as _},
-    Address, Env, Map, Vec,
+    Address, Env, Map,
 };
 
 #[test]
