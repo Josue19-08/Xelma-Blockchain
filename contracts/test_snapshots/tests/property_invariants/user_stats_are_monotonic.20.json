@@ -60,7 +60,7 @@
                         "symbol": "best_streak"
                       },
                       "val": {
-                        "u32": 6
+                        "u32": 2
                       }
                     },
                     {
@@ -76,7 +76,7 @@
                         "symbol": "total_losses"
                       },
                       "val": {
-                        "u32": 8
+                        "u32": 7
                       }
                     },
                     {
@@ -84,7 +84,7 @@
                         "symbol": "total_wins"
                       },
                       "val": {
-                        "u32": 14
+                        "u32": 4
                       }
                     }
                   ]
