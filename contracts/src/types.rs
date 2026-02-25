@@ -20,8 +20,8 @@ pub enum DataKey {
     Oracle,
     ActiveRound,
     Positions,
-    UpDownPositions,      // Map<Address, UserPosition> for Up/Down mode
-    PrecisionPositions,   // Map<Address, PrecisionPrediction> for Precision mode
+    UpDownPositions,    // Map<Address, UserPosition> for Up/Down mode
+    PrecisionPositions, // Map<Address, PrecisionPrediction> for Precision mode
     PendingWinnings(Address),
     UserStats(Address),
     BetWindowLedgers, // Bet window duration in ledgers
