@@ -295,3 +295,22 @@ The XLM Prediction Market smart contract has undergone comprehensive security ha
 **Reviewed by**: GitHub Copilot  
 **Tools Used**: Soroban SDK v23.4.0, Rust 1.92.0  
 **Testing Framework**: Soroban testutils
+
+
+@github-actions
+CI / Rust Tests (pull_request) Successful in 23s
+Details
+@github-actions
+CI / Contract Build (pull_request) Successful in 18s
+Details
+@github-actions
+CI / Format Check (pull_request) Successful in 15s
+Details
+@github-actions
+CI / Bindings Build (pull_request) Successful in 14s
+Details
+@github-actions
+CI / Parity Check (pull_request) Successful in 11s
+Details
+@github-actions
+CI / CI Success (pull_request) Successful in 3s
