@@ -45,4 +45,6 @@ pub enum ContractError {
     StaleOracleData = 18,
     /// Oracle payload round_id doesn't match ActiveRound
     InvalidOracleRound = 19,
+    /// An active round already exists and cannot be overwritten
+    RoundAlreadyActive = 20,
 }

@@ -2,7 +2,7 @@
 
 use crate::contract::{VirtualTokenContract, VirtualTokenContractClient};
 use crate::errors::ContractError;
-use crate::types::{BetSide, RoundMode};
+use crate::types::{BetSide, OraclePayload, RoundMode};
 use soroban_sdk::{
     testutils::{Address as _, Events, Ledger as _},
     Address, Env,
@@ -439,7 +439,20 @@ fn test_predict_price_valid_scales() {
         let user = Address::generate(&env);
         client.mint_initial(&user);
 
-        // Create new round for each test
+        // If a previous round is still active, resolve it before creating a new one
+        if let Some(round) = client.get_active_round() {
+            env.ledger().with_mut(|li| {
+                li.sequence_number = round.end_ledger;
+            });
+            client.resolve_round(&OraclePayload {
+                price: round.price_start,
+                timestamp: env.ledger().timestamp(),
+                round_id: round.start_ledger,
+            });
+        }
+
+        // Create new Precision round for each test case
+
         client.create_round(&1_0000000, &Some(1));
 
         // Should succeed with valid price scale
@@ -507,5 +520,6 @@ fn test_predict_price_event_emission() {
     let events = env.events().all();
 
     // Should have events (at least the prediction event)
+    assert!(!events.is_empty());
     assert!(!events.is_empty());
 }

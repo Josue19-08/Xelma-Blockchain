@@ -67,6 +67,11 @@ impl VirtualTokenContract {
 
         admin.require_auth();
 
+        // Prevent overwriting an already active round
+        if env.storage().persistent().has(&DataKey::ActiveRound) {
+            return Err(ContractError::RoundAlreadyActive);
+        }
+
         // Get configured windows (with defaults)
         let bet_ledgers: u32 = env
             .storage()

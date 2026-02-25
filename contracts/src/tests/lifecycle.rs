@@ -39,6 +39,37 @@ fn test_create_round() {
 }
 
 #[test]
+fn test_create_round_while_active_fails() {
+    let env = Env::default();
+    let contract_id = env.register(VirtualTokenContract, ());
+    let client = VirtualTokenContractClient::new(&env, &contract_id);
+
+    // Set up admin and oracle
+    let admin = Address::generate(&env);
+    let oracle = Address::generate(&env);
+    env.mock_all_auths();
+    client.initialize(&admin, &oracle);
+
+    // Create first round successfully
+    let start_price: u128 = 1_5000000;
+    client.create_round(&start_price, &None);
+
+    // Capture current active round for later comparison
+    let existing_round = client.get_active_round().expect("Round should exist");
+
+    // Attempt to create a second round while first is still active
+    let result = client.try_create_round(&2_0000000, &None);
+    assert_eq!(result, Err(Ok(ContractError::RoundAlreadyActive)));
+
+    // Ensure the original round remains unchanged
+    let round_after = client.get_active_round().expect("Round should still exist");
+    assert_eq!(round_after.price_start, existing_round.price_start);
+    assert_eq!(round_after.start_ledger, existing_round.start_ledger);
+    assert_eq!(round_after.bet_end_ledger, existing_round.bet_end_ledger);
+    assert_eq!(round_after.end_ledger, existing_round.end_ledger);
+}
+
+#[test]
 fn test_create_round_without_init_fails() {
     let env = Env::default();
     let contract_id = env.register(VirtualTokenContract, ());
