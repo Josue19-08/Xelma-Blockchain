@@ -43,4 +43,8 @@ pub enum ContractError {
     InvalidPriceScale = 17,
     /// An active round already exists and cannot be overwritten
     RoundAlreadyActive = 18,
+    /// Oracle data is too old (STALE)
+    StaleOracleData = 18,
+    /// Oracle payload round_id doesn't match ActiveRound
+    InvalidOracleRound = 19,
 }

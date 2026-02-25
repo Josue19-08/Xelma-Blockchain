@@ -284,7 +284,7 @@ We take security seriously. The contract has undergone comprehensive hardening:
 - `set_windows(bet_ledgers, run_ledgers)` - Configure round timing windows
 
 ### Oracle Functions:
-- `resolve_round(final_price)` - Resolve round and trigger payouts
+- `resolve_round(payload)` - Resolve round and trigger payouts (requires `OraclePayload` with price, timestamp, and round ID)
 
 ### Query Functions:
 - `get_active_round()` - View current round details (includes mode)

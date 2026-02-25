@@ -61,6 +61,15 @@ pub struct PrecisionPrediction {
     pub amount: i128,          // Bet amount
 }
 
+/// Oracle payload including price, timestamp and target round
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct OraclePayload {
+    pub price: u128,
+    pub timestamp: u64,
+    pub round_id: u32, // Matches Round.start_ledger
+}
+
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
 pub struct Round {
