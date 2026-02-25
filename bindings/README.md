@@ -52,3 +52,31 @@ contract.|
 ```
 
 As long as your editor is configured to show JavaScript/TypeScript documentation, you can pause your typing at that `|` to get a list of all exports and inline-documentation for each. It exports a separate [async](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/async_function) function for each method in the smart contract, with documentation for each generated from the comments the contract's author included in the original source code.
+
+# Running Tests
+
+The bindings include integration tests that verify runtime behavior against Soroban RPC.
+
+**Run all tests:**
+
+```bash
+npm test
+# or
+yarn test
+```
+
+**Run tests in watch mode:**
+
+```bash
+npm run test:watch
+```
+
+**Run with a deployed contract:**
+
+To run full end-to-end tests against a deployed contract, set the `CONTRACT_ID` environment variable:
+
+```bash
+CONTRACT_ID=CXXXXX... npm test
+```
+
+Without `CONTRACT_ID`, only unit tests and account setup tests will run. The contract-dependent tests will be skipped.
