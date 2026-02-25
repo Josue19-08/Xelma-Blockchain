@@ -192,6 +192,45 @@
             "key": {
               "vec": [
                 {
+                  "symbol": "LastRoundId"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "LastRoundId"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "u64": "1"
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          4095
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            "key": {
+              "vec": [
+                {
                   "symbol": "Oracle"
                 }
               ]
@@ -260,7 +299,7 @@
                 },
                 "durability": "persistent",
                 "val": {
-                  "i128": "1299461839"
+                  "i128": "759587657"
                 }
               }
             },
@@ -305,7 +344,7 @@
                 },
                 "durability": "persistent",
                 "val": {
-                  "i128": "1036589940"
+                  "i128": "236561794"
                 }
               }
             },
