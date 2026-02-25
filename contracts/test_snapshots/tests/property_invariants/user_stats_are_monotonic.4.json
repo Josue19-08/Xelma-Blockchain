@@ -60,7 +60,7 @@
                         "symbol": "best_streak"
                       },
                       "val": {
-                        "u32": 2
+                        "u32": 6
                       }
                     },
                     {
@@ -84,7 +84,7 @@
                         "symbol": "total_wins"
                       },
                       "val": {
-                        "u32": 6
+                        "u32": 15
                       }
                     }
                   ]
