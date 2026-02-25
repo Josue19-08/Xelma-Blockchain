@@ -2,7 +2,7 @@
 
 use crate::contract::{VirtualTokenContract, VirtualTokenContractClient};
 use crate::errors::ContractError;
-use crate::types::{BetSide, RoundMode};
+use crate::types::{BetSide, OraclePayload, RoundMode};
 use soroban_sdk::{
     testutils::{Address as _, Events, Ledger as _},
     Address, Env,
@@ -437,7 +437,11 @@ fn test_predict_price_valid_scales() {
             env.ledger().with_mut(|li| {
                 li.sequence_number = round.end_ledger;
             });
-            client.resolve_round(&round.price_start);
+            client.resolve_round(&OraclePayload {
+                price: round.price_start,
+                timestamp: env.ledger().timestamp(),
+                round_id: round.start_ledger,
+            });
         }
 
         // Create new Precision round for each test case
@@ -450,12 +454,10 @@ fn test_predict_price_valid_scales() {
         let prediction = client.get_user_precision_prediction(&user).unwrap();
         assert_eq!(prediction.predicted_price, *price);
 
-
         // Clean up for next iteration
         env.ledger().with_mut(|li| {
             li.sequence_number += 20;
         });
-
     }
 }
 
