@@ -1,5 +1,6 @@
 # Xelma - Decentralized XLM Price Prediction Market
 
+[![CI](https://github.com/TevaLabs/Xelma-Blockchain/actions/workflows/ci.yml/badge.svg)](https://github.com/TevaLabs/Xelma-Blockchain/actions/workflows/ci.yml)
 [![Rust](https://img.shields.io/badge/Rust-1.92.0-orange.svg)](https://www.rust-lang.org/)
 [![Soroban](https://img.shields.io/badge/Soroban-23.4.0-blue.svg)](https://soroban.stellar.org/)
 [![Tests](https://img.shields.io/badge/tests-55%2F55%20passing-brightgreen.svg)]()
@@ -303,7 +304,7 @@ We take security seriously. The contract has undergone comprehensive hardening:
 - `set_windows(bet_ledgers, run_ledgers)` - Configure round timing windows
 
 ### Oracle Functions:
-- `resolve_round(final_price)` - Resolve round and trigger payouts
+- `resolve_round(payload)` - Resolve round and trigger payouts (requires `OraclePayload` with price, timestamp, and round ID)
 
 ### Query Functions:
 - `get_active_round()` - View current round details (includes mode)

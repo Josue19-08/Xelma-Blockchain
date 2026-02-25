@@ -1,10 +1,11 @@
 //! Test modules for the XLM Price Prediction Market contract.
 
-mod initialization;
 mod betting;
-mod resolution;
-mod lifecycle;
 mod edge_cases;
+mod initialization;
+mod lifecycle;
 mod mode_tests;
+mod property_invariants;
+mod resolution;
+mod security;
 mod windows;
-
