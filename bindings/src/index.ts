@@ -128,7 +128,15 @@ export const ContractError = {
   /**
    * One or more window values exceed configured maximum bounds
    */
-  23: {message:"WindowOutOfRange"}
+  23: {message:"WindowOutOfRange"},
+  /**
+   * Oracle payload timestamp is in the future
+   */
+  24: {message:"FutureOracleData"},
+  /**
+   * Arithmetic overflow in payout accumulation — no funds moved
+   */
+  25: {message:"PayoutOverflow"}
 }
 
 /**
