@@ -99,7 +99,7 @@ fn test_claim_winnings_overflow_returns_payout_overflow() {
 
     // Storage must be unchanged — pending still i128::MAX, balance untouched
     assert_eq!(client.get_pending_winnings(&user), i128::MAX);
-    assert_eq!(client.balance(&user), 1_000_0000000);
+    assert_eq!(client.balance(&user), 10_000_000_000);
 }
 
 /// Inject pending = 1 and balance = i128::MAX → addition overflows.
@@ -192,9 +192,7 @@ fn test_record_refunds_overflow_returns_payout_overflow() {
     // Inject near-max existing pending winnings for alice
     env.as_contract(&contract_id, || {
         let key = DataKey::PendingWinnings(alice.clone());
-        env.storage()
-            .persistent()
-            .set(&key, &(i128::MAX - 1));
+        env.storage().persistent().set(&key, &(i128::MAX - 1));
     });
 
     // Resolve with unchanged price → refunds triggered
